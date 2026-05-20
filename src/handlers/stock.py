@@ -1,0 +1,271 @@
+"""股市处理器
+
+处理股市查看、买卖、K线图、新闻等指令。
+ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给绘图和展示层。
+"""
+import asyncio
+import os
+import tempfile
+
+from ..core.database import StockHistory, get_china_time
+from ..utils import plotter
+
+
+class StockHandler:
+    def __init__(self, plugin):
+        self.plugin = plugin
+
+    def _build_market_image(self, group_id, user_id):
+        if not self.plugin.stock_market:
+            return None
+
+        snapshot = self.plugin.stock_market.get_price_snapshot()
+        codes = list(snapshot.keys())
+
+        prev_prices = {}
+        with self.plugin.db.session_scope() as session:
+            for code in codes:
+                history = session.query(StockHistory).filter_by(
+                    code=code
+                ).order_by(StockHistory.timestamp.desc()).limit(2).all()
+                if len(history) >= 2:
+                    prev_prices[code] = history[1].close
+
+        market_data = []
+        for code, snap in snapshot.items():
+            price = snap["price"]
+            prev = prev_prices.get(code, price)
+            change = ((price - prev) / prev * 100) if prev > 0 else 0
+            market_data.append({
+                'code': code,
+                'price': price,
+                'change': change,
+                'trend': snap["trend"],
+            })
+
+        holdings_data = self.plugin.stock_market.get_holdings(group_id, user_id)
+
+        news_list = self.plugin.stock_market.get_today_news(group_id)
+        news_data = []
+        for n in news_list:
+            news_data.append({
+                'event_type': n['event_type'],
+                'content': n['content'],
+                'time': n['timestamp'].strftime("%H:%M") if n.get('timestamp') else "",
+            })
+
+        kline_images = {}
+        fetch_limit = self.plugin.config.stock.stock_kline_candles + 40
+        with self.plugin.db.session_scope() as session:
+            for code in codes:
+                history = session.query(StockHistory).filter_by(
+                    code=code
+                ).order_by(StockHistory.timestamp.desc()).limit(fetch_limit).all()
+                if history:
+                    # ORM -> dict 转换，避免 session 关闭后延迟加载
+                    history_dicts = [h.to_kline_dict() for h in reversed(history)]
+                    tech_levels = self.plugin.stock_market.get_tech_levels(code)
+                    kline_buf = plotter.plot_kline(
+                        history_dicts, title=f"{code} K线走势",
+                        tech_levels=tech_levels,
+                        max_candles=self.plugin.config.stock.stock_kline_candles,
+                        font_key=self.plugin.config.stock.stock_font,
+                    )
+                    if kline_buf:
+                        kline_images[code] = kline_buf
+
+        img_buf = plotter.render_stock_market_image(
+            market_data, holdings_data, news_data,
+            self.plugin.config.currency.currency_name,
+            self.plugin.config.currency.currency_icon,
+            kline_images,
+        )
+        for img_b in kline_images.values():
+            try:
+                img_b.close()
+            except Exception:
+                pass
+        return img_buf
+
+    def _build_kline_image(self, code, limit):
+        with self.plugin.db.session_scope() as session:
+            history = session.query(StockHistory).filter_by(
+                code=code
+            ).order_by(StockHistory.timestamp.desc()).limit(limit).all()
+            # ORM -> dict 转换
+            history_dicts = [h.to_kline_dict() for h in reversed(history)]
+
+        if not history_dicts:
+            return None
+
+        tech_levels = self.plugin.stock_market.get_tech_levels(code)
+        return plotter.plot_kline(
+            history_dicts, title=f"{code} K线走势",
+            tech_levels=tech_levels,
+            font_key=self.plugin.config.stock.stock_font,
+        )
+
+    def _save_temp_image(self, buf):
+        try:
+            fd, path = tempfile.mkstemp(suffix=".png")
+            with os.fdopen(fd, 'wb') as f:
+                f.write(buf.getvalue())
+            return path
+        except Exception:
+            return None
+
+    async def handle(self, event, args, group_id, user_id, user_name):
+        if not self.plugin.stock_market:
+            yield event.plain_result("股市模块未启用")
+            return
+
+        sub = args[2] if len(args) >= 3 else None
+
+        if sub is None:
+            yield event.plain_result(self._get_stock_help())
+            return
+
+        sub = args[2]
+
+        if sub == "market":
+            loop = asyncio.get_event_loop()
+            img_buf = await loop.run_in_executor(
+                None, self._build_market_image, group_id, user_id
+            )
+            if img_buf:
+                img_path = self._save_temp_image(img_buf)
+                if img_path:
+                    yield event.image_result(img_path)
+                else:
+                    yield event.plain_result("图片生成失败")
+            else:
+                status = self.plugin.stock_market.get_market_status()
+                yield event.plain_result(status)
+
+        elif sub == "buy":
+            if len(args) < 5:
+                yield event.plain_result("格式: /fc stock buy <代码> <数量>")
+                return
+            code = args[3].upper()
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, self.plugin.stock_market.execute_buy, group_id, user_id, code, args[4]
+            )
+            yield event.plain_result(result["msg"])
+
+        elif sub == "sell":
+            if len(args) < 5:
+                yield event.plain_result("格式: /fc stock sell <代码> <数量>")
+                return
+            code = args[3].upper()
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, self.plugin.stock_market.execute_sell, group_id, user_id, code, args[4]
+            )
+            yield event.plain_result(result["msg"])
+
+        elif sub == "assets":
+            holdings = self.plugin.stock_market.get_holdings(group_id, user_id)
+            if not holdings:
+                yield event.plain_result("暂无持仓")
+                return
+
+            msg = f"📈 {user_name} 的股票持仓\n━━━━━━━━━━━━━━\n"
+            total_value = 0
+            total_profit = 0
+            for h in holdings:
+                profit_sign = "+" if h['profit'] >= 0 else ""
+                msg += f"{h['code']}: {h['amount']:.2f}股\n  成本{h['avg_cost']:.2f} → 现价{h['current_price']:.2f}\n  市值{h['market_value']:.2f} ({profit_sign}{h['profit_pct']:.1f}%)\n"
+                total_value += h['market_value']
+                total_profit += h['profit']
+
+            profit_sign = "+" if total_profit >= 0 else ""
+            msg += f"\n📊 总市值: {total_value:.2f}\n📊 总盈亏: {profit_sign}{total_profit:.2f}"
+            yield event.plain_result(msg)
+
+        elif sub == "kline":
+            if len(args) < 4:
+                yield event.plain_result("格式: /fc stock kline <代码> [条数]")
+                return
+            code = args[3].upper()
+            if code not in self.plugin.stock_market.prices:
+                yield event.plain_result(f"股票代码 {code} 不存在")
+                return
+
+            limit = self.plugin.config.stock.stock_kline_candles
+            if len(args) >= 5:
+                try:
+                    limit = int(args[4])
+                    limit = max(10, min(200, limit))
+                except ValueError:
+                    pass
+
+            loop = asyncio.get_event_loop()
+            img_buf = await loop.run_in_executor(
+                None, self._build_kline_image, code, limit
+            )
+            if img_buf:
+                img_path = self._save_temp_image(img_buf)
+                if img_path:
+                    yield event.image_result(img_path)
+                else:
+                    yield event.plain_result("绘图保存失败")
+            else:
+                yield event.plain_result("绘图失败")
+
+        elif sub == "news":
+            news_list = self.plugin.stock_market.get_today_news(group_id)
+            if not news_list:
+                yield event.plain_result("今日暂无市场新闻")
+                return
+
+            now = get_china_time()
+            msg = f"📰 今日市场快讯 ({now.strftime('%m-%d')})\n━━━━━━━━━━━━━━\n"
+            for n in news_list:
+                t_str = n['timestamp'].strftime("%H:%M") if n.get('timestamp') else ""
+                event_icon = {"major_positive": "🚀", "positive": "📈", "slight_positive": "↗",
+                              "neutral": "➡️", "slight_negative": "↘", "negative": "📉",
+                              "major_negative": "💥", "volatility": "⚠️"}.get(n['event_type'], "📰")
+                msg += f"[{t_str}] {event_icon} {n['content']}\n"
+            yield event.plain_result(msg)
+
+        elif sub == "event":
+            if str(user_id) not in self.plugin.config.basic.admin_ids:
+                yield event.plain_result("仅限管理员使用")
+                return
+            target_code = args[3].upper() if len(args) >= 4 else None
+            if target_code and target_code not in self.plugin.stock_market.prices:
+                yield event.plain_result(f"股票代码 {target_code} 不存在")
+                return
+            news_result = self.plugin.stock_market.trigger_news(target_code)
+            if not news_result:
+                yield event.plain_result("事件生成失败")
+                return
+            event_icon = {"major_positive": "🚀", "positive": "📈", "slight_positive": "↗",
+                          "neutral": "➡️", "slight_negative": "↘", "negative": "📉",
+                          "major_negative": "💥", "volatility": "⚠️"}.get(news_result["event_type"], "📰")
+            msg = f"{event_icon} 市场事件触发！\n"
+            msg += f"公司：{news_result['name']}（{news_result['code']}）\n"
+            msg += f"内容：{news_result['content']}\n"
+            if news_result.get("broadcast"):
+                yield event.plain_result(msg)
+            else:
+                msg += "\n（事件已记录，未广播）"
+                yield event.plain_result(msg)
+
+        else:
+            yield event.plain_result("未知股市指令")
+
+    def _get_stock_help(self):
+        lines = [
+            "📈 股市指令",
+            "━━━━━━━━━━━━━━",
+            "  /fc stock market          股市总览(行情+持仓+K线+新闻)",
+            "  /fc stock buy <代码> <数量>  买入",
+            "  /fc stock sell <代码> <数量> 卖出",
+            "  /fc stock assets          我的持仓",
+            "  /fc stock kline <代码> [条数]  K线图(默认60条)",
+            "  /fc stock news            市场新闻",
+            "  /fc stock event [代码]     手动触发市场事件(管理员)",
+        ]
+        return "\n".join(lines)

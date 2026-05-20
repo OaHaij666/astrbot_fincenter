@@ -1,0 +1,65 @@
+# Tests
+tests/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Reference code
+cankao/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime data
+data/cache/
+data/backups/
+!data/cache/.gitkeep
+!data/backups/.gitkeep
+
+# Config state
+.cross_group_config
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# IDE
+.claude/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+*.egg
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploaded images
+goods_images/
+temp_images/
+
+# Image cache
+.image_cache/

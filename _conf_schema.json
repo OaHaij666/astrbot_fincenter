@@ -1,0 +1,340 @@
+{
+  "basic": {
+    "description": "基础设置",
+    "type": "object",
+    "items": {
+      "admin_ids": {
+        "description": "管理员 QQ 号列表",
+        "type": "list",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "cross_group_data": {
+        "description": "用户数据是否跨群共享（false=各群独立，true=跨群共享同一账户）",
+        "type": "bool",
+        "default": false
+      },
+      "group_filter_enabled": {
+        "description": "是否启用群过滤功能",
+        "type": "bool",
+        "default": false
+      },
+      "group_whitelist": {
+        "description": "群白名单（启用时仅这些群可用功能）",
+        "type": "list",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "group_blacklist": {
+        "description": "群黑名单（启用时这些群不可用功能）",
+        "type": "list",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      }
+    }
+  },
+  "currency": {
+    "description": "货币设置",
+    "type": "object",
+    "items": {
+      "currency_name": {
+        "description": "货币显示名称（如'金币','星币','摩拉'等）",
+        "type": "string",
+        "default": "金币"
+      },
+      "currency_icon": {
+        "description": "货币 Emoji 图标",
+        "type": "string",
+        "default": "💰"
+      },
+      "initial_balance": {
+        "description": "新用户开户初始资金",
+        "type": "float",
+        "default": 1000.0
+      },
+      "open_account_cost": {
+        "description": "代他人开户的费用（0=免费）",
+        "type": "float",
+        "default": 0.0
+      }
+    }
+  },
+  "signin": {
+    "description": "签到设置",
+    "type": "object",
+    "items": {
+      "signin_enabled": {
+        "description": "是否启用签到功能",
+        "type": "bool",
+        "default": true
+      },
+      "signin_reward_base": {
+        "description": "签到基础奖励金额",
+        "type": "float",
+        "default": 100.0
+      },
+      "signin_reward_var": {
+        "description": "签到奖励随机浮动范围",
+        "type": "float",
+        "default": 50.0
+      },
+      "signin_consecutive_bonus": {
+        "description": "连续签到每日递增奖励",
+        "type": "float",
+        "default": 20.0
+      },
+      "signin_max_consecutive": {
+        "description": "连续签到奖励上限天数",
+        "type": "int",
+        "default": 7
+      }
+    }
+  },
+  "chat_reward": {
+    "description": "发言奖励",
+    "type": "object",
+    "items": {
+      "chat_reward_enabled": {
+        "description": "是否启用发言奖励",
+        "type": "bool",
+        "default": true
+      },
+      "chat_reward_amount": {
+        "description": "每条消息奖励金额",
+        "type": "float",
+        "default": 1.0
+      },
+      "chat_reward_cooldown": {
+        "description": "发言奖励冷却时间（秒）",
+        "type": "int",
+        "default": 60
+      },
+      "chat_reward_daily_limit": {
+        "description": "每日发言奖励上限次数",
+        "type": "int",
+        "default": 50
+      }
+    }
+  },
+  "stock": {
+    "description": "股市设置",
+    "type": "object",
+    "items": {
+      "stock_enabled": {
+        "description": "是否启用股市模块",
+        "type": "bool",
+        "default": true
+      },
+      "stock_companies": {
+        "description": "可交易的公司/股票列表",
+        "type": "list",
+        "items": {
+          "type": "dict"
+        },
+        "default": [
+          {"code": "ARASAKA", "name": "荒坂集团 Arasaka", "icon": "🏯", "initial_price": 150.0, "description": "日本巨型安保企业财团，从事安保承包、银行和轻重工业制造。全球最具影响力的企业之一，拥有庞大的私人军队和律师团队。与军用科技是死对头。"},
+          {"code": "KANGTAO", "name": "康陶 Kang Tao", "icon": "🎯", "initial_price": 120.0, "description": "中国武器制造商，以智能武器系统闻名。采用陀螺射弹技术发射无壳制导弹药，在智能武器细分市场占据第一。政府背景深厚，是夜之城第四大雇主。"},
+          {"code": "MILITECH", "name": "军用科技 Militech", "icon": "🔫", "initial_price": 130.0, "description": "全球最大武器和军用载具制造商，为新美国政府提供装备。与荒坂是死对头，第四次企业战争的主要参与者。业务涵盖单兵武器、无人机、坦克、飞行器等。"}
+        ]
+      },
+      "stock_volatility": {
+        "description": "价格波动率（正态分布标准差）",
+        "type": "float",
+        "default": 0.02
+      },
+      "stock_update_interval": {
+        "description": "价格更新间隔（秒）",
+        "type": "int",
+        "default": 300
+      },
+      "stock_fee_rate": {
+        "description": "交易手续费率",
+        "type": "float",
+        "default": 0.001
+      },
+      "stock_trading_hours": {
+        "description": "是否限制交易时间（false=24h可交易，true=模拟A股时段）",
+        "type": "bool",
+        "default": false
+      },
+      "stock_trend_enabled": {
+        "description": "是否启用七级趋势系统（-3~+3）",
+        "type": "bool",
+        "default": true
+      },
+      "stock_tech_analysis_enabled": {
+        "description": "是否启用技术分析模拟（支撑/阻力/回调）",
+        "type": "bool",
+        "default": true
+      },
+      "stock_kline_candles": {
+        "description": "K线图默认展示柱子数量",
+        "type": "int",
+        "default": 50
+      },
+      "stock_font": {
+        "description": "K线图字体（插件内置 Source Han Sans SC，无需修改）",
+        "type": "string",
+        "default": "",
+        "invisible": true
+      }
+    }
+  },
+  "stock_news": {
+    "description": "股市新闻设置",
+    "type": "object",
+    "items": {
+      "stock_news_enabled": {
+        "description": "是否启用市场新闻生成",
+        "type": "bool",
+        "default": true
+      },
+      "stock_news_source": {
+        "description": "新闻来源：template=模板新闻, llm=LLM生成, both=两者混合",
+        "type": "string",
+        "default": "template"
+      },
+      "stock_news_trigger_prob": {
+        "description": "每次价格更新时随机触发新闻事件的概率 (0-1)",
+        "type": "float",
+        "default": 0.3
+      },
+      "stock_news_broadcast": {
+        "description": "新闻事件触发时是否自动广播到群聊",
+        "type": "bool",
+        "default": true
+      },
+      "stock_news_history_count": {
+        "description": "LLM生成新闻时参考的历史新闻条数",
+        "type": "int",
+        "default": 10
+      },
+      "stock_news_provider_id": {
+        "description": "新闻生成使用的模型提供商ID（留空使用主对话模型）",
+        "type": "string",
+        "default": ""
+      },
+      "stock_llm_prompt_template": {
+        "description": "自定义 LLM 新闻生成 Prompt 模板（留空使用默认）",
+        "type": "string",
+        "default": ""
+      },
+      "stock_news_prob_major_positive": {
+        "description": "重大利好新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.05
+      },
+      "stock_news_prob_positive": {
+        "description": "一般利好新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.15
+      },
+      "stock_news_prob_slight_positive": {
+        "description": "轻微利好新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.20
+      },
+      "stock_news_prob_neutral": {
+        "description": "中性新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.25
+      },
+      "stock_news_prob_slight_negative": {
+        "description": "轻微利空新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.20
+      },
+      "stock_news_prob_negative": {
+        "description": "一般利空新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.12
+      },
+      "stock_news_prob_major_negative": {
+        "description": "重大利空新闻概率 (0-1)",
+        "type": "float",
+        "default": 0.03
+      },
+      "stock_news_prob_volatility": {
+        "description": "不确定性/波动事件概率 (0-1)",
+        "type": "float",
+        "default": 0.10
+      }
+    }
+  },
+  "goods": {
+    "description": "物资系统设置",
+    "type": "object",
+    "items": {
+      "goods_enabled": {
+        "description": "是否启用物资系统",
+        "type": "bool",
+        "default": true
+      },
+      "goods_refresh_interval": {
+        "description": "物资市场刷新间隔（秒），默认每日",
+        "type": "int",
+        "default": 86400
+      },
+      "goods_price_volatility": {
+        "description": "物资价格波动幅度",
+        "type": "float",
+        "default": 0.1
+      },
+      "goods_user_trade_enabled": {
+        "description": "是否允许玩家间物资交易",
+        "type": "bool",
+        "default": true
+      },
+      "goods_user_trade_tax": {
+        "description": "玩家间物资交易税率",
+        "type": "float",
+        "default": 0.05
+      }
+    }
+  },
+  "paid_cmd": {
+    "description": "收费指令设置",
+    "type": "object",
+    "items": {
+      "paid_cmd_enabled": {
+        "description": "是否启用收费指令功能",
+        "type": "bool",
+        "default": false
+      },
+      "paid_cmd_default_cost": {
+        "description": "新增收费指令时的默认费用",
+        "type": "float",
+        "default": 50.0
+      },
+      "paid_cmd_insufficient_msg": {
+        "description": "余额不足时的提示消息",
+        "type": "string",
+        "default": "💸 余额不足！执行该指令需要 {cost} {currency}，你当前余额为 {balance} {currency}。"
+      },
+      "paid_cmd_deduct_msg": {
+        "description": "扣费成功提示消息（留空则不提示）",
+        "type": "string",
+        "default": ""
+      },
+      "paid_cmd_ignore_admin": {
+        "description": "管理员是否跳过扣费（true=管理员免费，false=管理员也扣费）",
+        "type": "bool",
+        "default": true
+      },
+      "paid_cmd_prefixes": {
+        "description": "指令前缀列表（用于识别收费指令）",
+        "type": "list",
+        "items": {
+          "type": "string"
+        },
+        "default": ["/"]
+      }
+    }
+  }
+}

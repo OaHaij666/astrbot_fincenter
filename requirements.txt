@@ -1,0 +1,7 @@
+sqlalchemy
+pandas
+matplotlib
+mplfinance
+mplfonts
+Pillow
+requests

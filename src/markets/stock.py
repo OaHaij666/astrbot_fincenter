@@ -1,0 +1,821 @@
+"""股市引擎模块
+
+提供股票市场模拟引擎，包含价格更新、趋势计算、技术分析、新闻事件等功能。
+所有数据库操作通过 session_scope() 上下文管理器进行，确保事务安全。
+交易操作在锁内完成全部数据库写入，消除竞态条件。
+"""
+import threading
+import time
+import random
+import math
+import queue as queue_mod
+import asyncio
+from datetime import datetime, timedelta, timezone
+
+from ..core.database import (
+    DB, StockCompany, StockHolding, StockHistory, StockNews,
+    StockEventState, UserAccount, get_china_time, sync_network_time
+)
+from ..services.news import StockNewsGenerator, EVENT_IMPACTS, StockEventType
+from ..config import StockConfig, StockNewsConfig
+
+
+TREND_BASE_RANGES = {
+    3: (0.02, 0.05),
+    2: (0.01, 0.03),
+    1: (0.003, 0.015),
+    0: (-0.005, 0.005),
+    -1: (-0.015, -0.003),
+    -2: (-0.03, -0.01),
+    -3: (-0.05, -0.02),
+}
+
+TREND_TRANSITIONS = {
+    3: {3: 0.50, 2: 0.30, 1: 0.15, 0: 0.05},
+    2: {3: 0.20, 2: 0.45, 1: 0.25, 0: 0.10},
+    1: {2: 0.15, 1: 0.50, 0: 0.25, -1: 0.10},
+    0: {1: 0.20, 0: 0.50, -1: 0.20, 2: 0.05, -2: 0.05},
+    -1: {-2: 0.10, -1: 0.50, 0: 0.25, 1: 0.15},
+    -2: {-3: 0.10, -2: 0.45, -1: 0.25, 0: 0.20},
+    -3: {-3: 0.50, -2: 0.30, -1: 0.15, 0: 0.05},
+}
+
+TREND_REVERSION_FACTOR = 0.003
+TREND_MAX_DURATION = 15
+INTRA_PERIOD_STEPS = 24
+VOLUME_BASE_MIN = 80.0
+VOLUME_BASE_MAX = 300.0
+VOLUME_TREND_MULTIPLIER = 1.8
+VOLUME_VOLATILITY_SENSITIVITY = 40.0
+
+
+class StockTechnicalState:
+    """技术分析状态"""
+    def __init__(self):
+        self.support = None
+        self.resistance = None
+        self.peak_detected = False
+        self.trough_detected = False
+        self.recent_highs = []
+        self.recent_lows = []
+        self.local_maxima = []
+        self.local_minima = []
+        self.bollinger_upper = None
+        self.bollinger_lower = None
+        self.bollinger_mid = None
+
+
+class StockMarket:
+    """股市引擎
+
+    管理股票价格模拟、趋势计算、技术分析和新闻事件。
+    接受类型化的 StockConfig 和 StockNewsConfig 配置对象。
+    """
+
+    def __init__(self, db: DB, stock_config: StockConfig, news_config: StockNewsConfig):
+        self.db = db
+        self.running = False
+        self.thread = None
+        self.lock = threading.Lock()
+
+        self.volatility = stock_config.stock_volatility
+        self.update_interval = stock_config.stock_update_interval
+        self.fee_rate = stock_config.stock_fee_rate
+        self.trading_hours = stock_config.stock_trading_hours
+        self.trend_enabled = stock_config.stock_trend_enabled
+        self.tech_enabled = stock_config.stock_tech_analysis_enabled
+
+        self.news_enabled = news_config.stock_news_enabled
+        self.news_trigger_prob = news_config.stock_news_trigger_prob
+        self.news_history_count = news_config.stock_news_history_count
+        self.news_broadcast = news_config.stock_news_broadcast
+        self.news_provider_id = news_config.stock_news_provider_id
+        self.news_generator = StockNewsGenerator(db, news_config) if self.news_enabled else None
+
+        self.companies_config = stock_config.stock_companies
+        self.is_open = True
+        self.manual_override = None
+
+        self._main_loop = None
+        self._pending_llm_news = queue_mod.Queue()
+        self._price_snapshot = {}
+        self._snapshot_lock = threading.Lock()
+
+        self.prices = {}
+        self.trend_levels = {}
+        self.trend_duration = {}
+        self.base_prices = {}
+        self.current_candles = {}
+        self.tech_states = {}
+        self.last_update_time = time.time()
+        self.update_count = 0
+
+        sync_network_time()
+        self._init_companies()
+
+    def _init_companies(self):
+        with self.db.session_scope() as session:
+            now = get_china_time()
+            for comp_cfg in self.companies_config:
+                code = comp_cfg.get("code", "").upper()
+                if not code:
+                    continue
+
+                existing = session.query(StockCompany).filter_by(code=code).first()
+                if existing:
+                    self.prices[code] = existing.current_price
+                    self.trend_levels[code] = existing.trend_level
+                else:
+                    initial_price = float(comp_cfg.get("initial_price", 100.0))
+                    self.prices[code] = initial_price
+                    self.trend_levels[code] = 0
+
+                    company = StockCompany(
+                        group_id="",
+                        code=code,
+                        name=comp_cfg.get("name", code),
+                        icon=comp_cfg.get("icon", ""),
+                        description=comp_cfg.get("description", ""),
+                        current_price=initial_price,
+                        trend_level=0,
+                        last_update=now,
+                    )
+                    session.add(company)
+
+                self.base_prices[code] = self.prices[code]
+                self.trend_duration[code] = 0
+                self.current_candles[code] = {
+                    "open": self.prices[code],
+                    "high": self.prices[code],
+                    "low": self.prices[code],
+                    "close": self.prices[code],
+                    "volume": 0.0,
+                    "simulated_volume": 0.0,
+                    "start_time": now,
+                }
+                self.tech_states[code] = StockTechnicalState()
+
+            self._load_history(session)
+
+    def _load_history(self, session):
+        for code in self.prices:
+            last = session.query(StockHistory).filter_by(
+                code=code
+            ).order_by(StockHistory.timestamp.desc()).first()
+            if last:
+                self.prices[code] = last.close
+                self.current_candles[code]["open"] = last.close
+                self.current_candles[code]["high"] = last.close
+                self.current_candles[code]["low"] = last.close
+                self.current_candles[code]["close"] = last.close
+            else:
+                self._seed_initial_history(session, code)
+
+    def _seed_initial_history(self, session, code):
+        now = get_china_time()
+        price = self.prices[code]
+        volatility = self.volatility
+        seed_count = 50
+        for i in range(seed_count, 0, -1):
+            ts = now - timedelta(seconds=i * max(self.update_interval, 60))
+            open_p = price
+            high, low, close = self._simulate_intra_period(price, random.gauss(0, volatility * 2), volatility)
+            pct = abs(close - open_p) / max(open_p, 0.01)
+            vol = self._simulate_volume(code, pct, 0)
+            history = StockHistory(
+                group_id="",
+                code=code,
+                timestamp=ts,
+                open=open_p,
+                high=high,
+                low=low,
+                close=close,
+                volume=vol,
+            )
+            session.add(history)
+        self.prices[code] = price
+        self.current_candles[code]["open"] = price
+        self.current_candles[code]["high"] = price
+        self.current_candles[code]["low"] = price
+        self.current_candles[code]["close"] = price
+
+    def set_main_loop(self, loop):
+        self._main_loop = loop
+
+    def drain_pending_news_codes(self):
+        codes = []
+        while not self._pending_llm_news.empty():
+            try:
+                codes.append(self._pending_llm_news.get_nowait())
+            except queue_mod.Empty:
+                break
+        return codes
+
+    def get_price_snapshot(self):
+        with self._snapshot_lock:
+            if self._price_snapshot:
+                return dict(self._price_snapshot)
+        return self._build_price_snapshot()
+
+    def _build_price_snapshot(self):
+        with self.lock:
+            snap = {}
+            for code in self.prices:
+                snap[code] = {
+                    "price": self.prices[code],
+                    "trend": self.trend_levels.get(code, 0),
+                    "open": self.current_candles[code]["open"],
+                    "high": self.current_candles[code]["high"],
+                    "low": self.current_candles[code]["low"],
+                    "close": self.current_candles[code]["close"],
+                    "volume": self.current_candles[code]["volume"] + self.current_candles[code]["simulated_volume"],
+                }
+        with self._snapshot_lock:
+            self._price_snapshot = snap
+        return dict(snap)
+
+    def start(self):
+        if self.running:
+            return
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join()
+
+    def set_open(self, is_open: bool):
+        self.manual_override = is_open
+        self.is_open = is_open
+
+    def _check_market_hours(self):
+        now = get_china_time()
+        if now.weekday() >= 5:
+            return False
+        current_time = now.time()
+        morning_start = datetime.strptime("09:30", "%H:%M").time()
+        morning_end = datetime.strptime("11:30", "%H:%M").time()
+        afternoon_start = datetime.strptime("13:00", "%H:%M").time()
+        afternoon_end = datetime.strptime("15:00", "%H:%M").time()
+        return (morning_start <= current_time <= morning_end) or \
+               (afternoon_start <= current_time <= afternoon_end)
+
+    def _loop(self):
+        while self.running:
+            try:
+                if self.trading_hours:
+                    should_be_open = self._check_market_hours()
+                    if self.manual_override is not None:
+                        self.is_open = self.manual_override
+                    else:
+                        self.is_open = should_be_open
+
+                if not self.is_open:
+                    time.sleep(1)
+                    continue
+
+                now_ts = time.time()
+                if now_ts - self.last_update_time >= self.update_interval:
+                    self.last_update_time = now_ts
+                    self.update_count += 1
+                    self._refresh_all_tech_levels()
+                    self._update_prices()
+                    self._save_candles()
+
+                    if self.news_enabled and self.news_generator:
+                        if random.random() < self.news_trigger_prob:
+                            if self.news_generator.news_source in ("llm", "both"):
+                                code = random.choice(list(self.prices.keys()))
+                                self._pending_llm_news.put(code)
+                                if self._main_loop and self._main_loop.is_running():
+                                    try:
+                                        asyncio.run_coroutine_threadsafe(
+                                            self._async_process_llm_news(), self._main_loop
+                                        )
+                                    except Exception:
+                                        pass
+                            else:
+                                self._generate_news()
+
+                time.sleep(1)
+            except Exception as e:
+                print(f"[FinCenter] Stock market loop error: {e}")
+                time.sleep(5)
+
+    def _calc_trend_change(self, trend_level, volatility):
+        if not self.trend_enabled:
+            return random.gauss(0, volatility)
+        low, high = TREND_BASE_RANGES.get(trend_level, (-0.005, 0.005))
+        base = random.uniform(low, high)
+        noise = random.gauss(0, volatility * 0.3)
+        return base + noise
+
+    def _calc_mean_reversion(self, code, price):
+        base_price = self.base_prices.get(code)
+        if not base_price or base_price <= 0:
+            return 0.0
+        deviation = (price - base_price) / base_price
+        return -TREND_REVERSION_FACTOR * deviation
+
+    def _simulate_intra_period(self, open_price, total_change, volatility, steps=INTRA_PERIOD_STEPS):
+        price = open_price
+        high = open_price
+        low = open_price
+        step_drift = total_change / steps
+        step_vol = volatility / math.sqrt(steps)
+
+        for i in range(steps):
+            progress = (i + 1) / steps
+            drift = step_drift * (1.0 - 0.3 * math.sin(math.pi * progress))
+            noise = random.gauss(0, step_vol)
+            micro_momentum = 0.0
+            if i > 0:
+                prev_change = (price - open_price) / open_price
+                micro_momentum = prev_change * 0.05 * random.choice([-1, 1])
+
+            price *= (1 + drift + noise + micro_momentum)
+            price = max(0.01, price)
+            high = max(high, price)
+            low = min(low, price)
+
+        return high, low, price
+
+    def _simulate_volume(self, code, price_change_pct, trend_level):
+        base_volume = random.uniform(VOLUME_BASE_MIN, VOLUME_BASE_MAX)
+        volatility_factor = 1.0 + abs(price_change_pct) * VOLUME_VOLATILITY_SENSITIVITY
+        abs_trend = abs(trend_level)
+        trend_factor = 1.0 + (abs_trend - 1) * 0.3 if abs_trend >= 2 else 1.0
+        if abs_trend >= 2:
+            trend_factor = VOLUME_TREND_MULTIPLIER
+        noise = random.gauss(1.0, 0.15)
+        noise = max(0.3, min(2.5, noise))
+        return base_volume * volatility_factor * trend_factor * noise
+
+    def _apply_technical_adjustment(self, code, price, trend_level):
+        if not self.tech_enabled:
+            return 0.0
+
+        tech = self.tech_states.get(code)
+        if not tech:
+            return 0.0
+
+        adjustment = 0.0
+
+        if tech.resistance and price >= tech.resistance * 0.97:
+            if trend_level > 0:
+                adjustment -= 0.01
+                if random.random() < 0.3:
+                    tech.peak_detected = True
+
+        if tech.support and price <= tech.support * 1.03:
+            if trend_level < 0:
+                adjustment += 0.01
+                if random.random() < 0.3:
+                    tech.trough_detected = True
+
+        if tech.peak_detected and trend_level >= 2:
+            adjustment -= 0.02
+            tech.peak_detected = False
+
+        if tech.trough_detected and trend_level <= -2:
+            adjustment += 0.02
+            tech.trough_detected = False
+
+        if tech.bollinger_upper and price >= tech.bollinger_upper:
+            adjustment -= 0.005
+        if tech.bollinger_lower and price <= tech.bollinger_lower:
+            adjustment += 0.005
+
+        return adjustment
+
+    def _find_local_extrema(self, values, window=3):
+        maxima = []
+        minima = []
+        for i in range(window, len(values) - window):
+            is_max = all(values[i] >= values[i + j] for j in range(-window, window + 1) if j != 0)
+            is_min = all(values[i] <= values[i + j] for j in range(-window, window + 1) if j != 0)
+            if is_max:
+                maxima.append(values[i])
+            if is_min:
+                minima.append(values[i])
+        return maxima, minima
+
+    def _update_tech_levels(self, code):
+        with self.db.session_scope() as session:
+            history = session.query(StockHistory).filter_by(
+                code=code
+            ).order_by(StockHistory.timestamp.desc()).limit(30).all()
+
+            tech = self.tech_states.get(code)
+            if not tech or len(history) < 5:
+                return
+
+            highs = [h.high for h in history]
+            lows = [h.low for h in history]
+            closes = [h.close for h in history]
+
+            local_maxima, local_minima = self._find_local_extrema(closes, window=2)
+            tech.local_maxima = local_maxima
+            tech.local_minima = local_minima
+
+            if local_maxima:
+                top2 = sorted(local_maxima, reverse=True)[:2]
+                tech.resistance = sum(top2) / len(top2) * 0.99
+            else:
+                tech.resistance = max(highs) * 0.98
+
+            if local_minima:
+                bottom2 = sorted(local_minima)[:2]
+                tech.support = sum(bottom2) / len(bottom2) * 1.01
+            else:
+                tech.support = min(lows) * 1.02
+
+            if len(closes) >= 20:
+                ma20 = sum(closes[:20]) / 20
+                std20 = math.sqrt(sum((c - ma20) ** 2 for c in closes[:20]) / 20)
+                tech.bollinger_mid = ma20
+                tech.bollinger_upper = ma20 + 2 * std20
+                tech.bollinger_lower = ma20 - 2 * std20
+
+    def _refresh_all_tech_levels(self):
+        for code in list(self.prices.keys()):
+            self._update_tech_levels(code)
+
+    def _markov_transition(self, current_trend, duration=0):
+        transitions = dict(TREND_TRANSITIONS.get(current_trend, {0: 1.0}))
+
+        if duration > TREND_MAX_DURATION:
+            revert_prob = min(0.6, 0.1 * (duration - TREND_MAX_DURATION))
+            center = 0
+            if current_trend > 0:
+                for t in range(current_trend - 1, -4, -1):
+                    if t in transitions:
+                        transitions[t] = transitions.get(t, 0) + revert_prob / max(1, abs(current_trend - t))
+                        break
+            elif current_trend < 0:
+                for t in range(current_trend + 1, 4):
+                    if t in transitions:
+                        transitions[t] = transitions.get(t, 0) + revert_prob / max(1, abs(current_trend - t))
+                        break
+            if center in transitions:
+                transitions[center] = transitions.get(center, 0) + revert_prob * 0.5
+
+        targets = list(transitions.keys())
+        weights = list(transitions.values())
+        total = sum(weights)
+        weights = [w / total for w in weights]
+        return random.choices(targets, weights=weights, k=1)[0]
+
+    def _update_prices(self):
+        db_updates = {}
+        active_events_cache = {}
+        if self.news_enabled and self.news_generator:
+            for code in list(self.prices.keys()):
+                active_events_cache[code] = self.news_generator.get_active_events("", code)
+
+        with self.lock:
+            for code in list(self.prices.keys()):
+                trend_level = self.trend_levels.get(code, 0)
+                self.trend_duration[code] = self.trend_duration.get(code, 0) + 1
+
+                event_adjustment = 0.0
+                volatility_multiplier = 1.0
+                events = active_events_cache.get(code, [])
+                for ev in events:
+                    if ev["trend_shift"] > 0:
+                        event_adjustment += 0.005
+                    elif ev["trend_shift"] < 0:
+                        event_adjustment -= 0.005
+                    volatility_multiplier = max(volatility_multiplier, ev.get("volatility_boost", 1.0))
+
+                effective_volatility = self.volatility * volatility_multiplier
+                trend_change = self._calc_trend_change(trend_level, effective_volatility)
+                tech_adjustment = self._apply_technical_adjustment(code, self.prices[code], trend_level)
+                mean_reversion = self._calc_mean_reversion(code, self.prices[code])
+
+                total_change = trend_change + tech_adjustment + event_adjustment + mean_reversion
+
+                open_price = self.prices[code]
+                high, low, close_price = self._simulate_intra_period(
+                    open_price, total_change, effective_volatility
+                )
+
+                self.prices[code] = max(0.01, close_price)
+
+                price_change_pct = (close_price - open_price) / open_price if open_price > 0 else 0
+                sim_volume = self._simulate_volume(code, price_change_pct, trend_level)
+
+                candle = self.current_candles[code]
+                candle["high"] = max(candle["high"], high)
+                candle["low"] = min(candle["low"], low)
+                candle["close"] = self.prices[code]
+                candle["simulated_volume"] += sim_volume
+
+                if self.trend_enabled and random.random() < 0.1:
+                    new_trend = self._markov_transition(trend_level, self.trend_duration.get(code, 0))
+                    if new_trend != trend_level:
+                        self.trend_levels[code] = new_trend
+                        self.trend_duration[code] = 0
+
+                db_updates[code] = {
+                    "price": self.prices[code],
+                    "trend": self.trend_levels[code],
+                }
+
+        if self.news_enabled and self.news_generator:
+            for code in list(self.prices.keys()):
+                self.news_generator.tick_events("", code)
+
+        if db_updates:
+            with self.db.session_scope() as session:
+                now = get_china_time()
+                for code, upd in db_updates.items():
+                    company = session.query(StockCompany).filter_by(code=code).first()
+                    if company:
+                        company.current_price = upd["price"]
+                        company.trend_level = upd["trend"]
+                        company.last_update = now
+
+    def _save_candles(self):
+        with self.lock:
+            now = get_china_time()
+            candle_data = {}
+            for code in list(self.prices.keys()):
+                candle = self.current_candles[code]
+                total_volume = candle["volume"] + candle["simulated_volume"]
+                candle_data[code] = {
+                    "timestamp": now,
+                    "open": candle["open"],
+                    "high": candle["high"],
+                    "low": candle["low"],
+                    "close": candle["close"],
+                    "volume": total_volume,
+                }
+                self.current_candles[code] = {
+                    "open": self.prices[code],
+                    "high": self.prices[code],
+                    "low": self.prices[code],
+                    "close": self.prices[code],
+                    "volume": 0.0,
+                    "simulated_volume": 0.0,
+                    "start_time": now,
+                }
+
+        with self.db.session_scope() as session:
+            for code, cd in candle_data.items():
+                history = StockHistory(
+                    group_id="",
+                    code=code,
+                    timestamp=cd["timestamp"],
+                    open=cd["open"],
+                    high=cd["high"],
+                    low=cd["low"],
+                    close=cd["close"],
+                    volume=cd["volume"],
+                )
+                session.add(history)
+
+    def _generate_news(self, target_code=None):
+        """生成新闻事件（内部方法）"""
+        if not self.prices:
+            return
+        code = target_code if target_code and target_code in self.prices else random.choice(list(self.prices.keys()))
+
+        with self.db.session_scope() as session:
+            company = session.query(StockCompany).filter_by(code=code).first()
+            if not company:
+                return
+
+            history_news = []
+            news_records = session.query(StockNews).filter_by(
+                company_code=code
+            ).order_by(StockNews.timestamp.desc()).limit(self.news_history_count).all()
+            history_news = [{"event_type": n.event_type, "content": n.content} for n in news_records]
+
+        news_result = self.news_generator.generate_news(
+            group_id="",
+            company_code=code,
+            company_name=company.name,
+            current_price=self.prices[code],
+            trend_level=self.trend_levels.get(code, 0),
+            description=getattr(company, 'description', ''),
+            history_news=history_news,
+        )
+
+        if news_result["trend_shift"] != 0:
+            new_trend = self.trend_levels.get(code, 0) + news_result["trend_shift"]
+            self.trend_levels[code] = max(-3, min(3, new_trend))
+
+        if news_result["immediate_jump"] != 0:
+            with self.lock:
+                self.prices[code] *= (1 + news_result["immediate_jump"])
+                self.prices[code] = max(0.01, self.prices[code])
+
+        return {
+            "code": code,
+            "name": company.name,
+            "content": news_result["content"],
+            "event_type": news_result["event_type"].value,
+            "broadcast": self.news_broadcast,
+        }
+
+    def trigger_news(self, target_code=None):
+        """公开接口：手动触发新闻事件
+
+        Args:
+            target_code: 目标股票代码，为 None 时随机选择
+
+        Returns:
+            新闻结果字典，或 None
+        """
+        return self._generate_news(target_code)
+
+    async def _async_process_llm_news(self):
+        codes = self.drain_pending_news_codes()
+        for code in codes:
+            try:
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self._generate_news, code)
+            except Exception as e:
+                print(f"[FinCenter] Async LLM news error: {e}")
+
+    def execute_buy(self, group_id, user_id, code, amount):
+        """执行买入操作
+
+        在锁内完成价格读取和数据库写入，消除竞态条件。
+        """
+        if code not in self.prices:
+            return {"success": False, "msg": f"股票代码 {code} 不存在"}
+
+        if not self.is_open:
+            return {"success": False, "msg": "当前休市中，无法交易"}
+
+        try:
+            amount = float(amount)
+        except (ValueError, TypeError):
+            return {"success": False, "msg": "数量必须是数字"}
+
+        if amount <= 0:
+            return {"success": False, "msg": "数量必须大于0"}
+
+        with self.lock:
+            price = self.prices[code]
+            self.current_candles[code]["volume"] += amount
+
+            total_cost = price * amount
+            fee = total_cost * self.fee_rate
+            cost_with_fee = total_cost + fee
+
+            with self.db.session_scope() as session:
+                user = session.query(UserAccount).filter_by(
+                    group_id=group_id, user_id=user_id
+                ).first()
+
+                if not user:
+                    return {"success": False, "msg": "请先开户"}
+
+                if user.balance < cost_with_fee:
+                    return {"success": False, "msg": f"余额不足。需要 {cost_with_fee:.2f}，当前余额 {user.balance:.2f}"}
+
+                user.balance -= cost_with_fee
+                user.total_spent += cost_with_fee
+
+                holding = session.query(StockHolding).filter_by(
+                    group_id=group_id, user_id=user_id, code=code
+                ).first()
+
+                if holding:
+                    total_amount = holding.amount + amount
+                    holding.avg_cost = (holding.avg_cost * holding.amount + total_cost) / total_amount
+                    holding.amount = total_amount
+                else:
+                    holding = StockHolding(
+                        group_id=group_id,
+                        user_id=user_id,
+                        code=code,
+                        amount=amount,
+                        avg_cost=price,
+                    )
+                    session.add(holding)
+
+        return {
+            "success": True,
+            "msg": f"买入成功！{code} x {amount:.2f}，成交价 {price:.2f}，手续费 {fee:.2f}，共花费 {cost_with_fee:.2f}",
+            "price": price,
+            "amount": amount,
+            "fee": fee,
+            "total": cost_with_fee,
+        }
+
+    def execute_sell(self, group_id, user_id, code, amount):
+        """执行卖出操作
+
+        在锁内完成价格读取和数据库写入，消除竞态条件。
+        """
+        if code not in self.prices:
+            return {"success": False, "msg": f"股票代码 {code} 不存在"}
+
+        if not self.is_open:
+            return {"success": False, "msg": "当前休市中，无法交易"}
+
+        try:
+            amount = float(amount)
+        except (ValueError, TypeError):
+            return {"success": False, "msg": "数量必须是数字"}
+
+        if amount <= 0:
+            return {"success": False, "msg": "数量必须大于0"}
+
+        with self.lock:
+            price = self.prices[code]
+            self.current_candles[code]["volume"] += amount
+
+            total_revenue = price * amount
+            fee = total_revenue * self.fee_rate
+            revenue_after_fee = total_revenue - fee
+
+            with self.db.session_scope() as session:
+                holding = session.query(StockHolding).filter_by(
+                    group_id=group_id, user_id=user_id, code=code
+                ).first()
+
+                if not holding or holding.amount < amount:
+                    current = holding.amount if holding else 0
+                    return {"success": False, "msg": f"持仓不足。当前持有 {current:.2f} {code}"}
+
+                holding.amount -= amount
+                if holding.amount < 0.0001:
+                    session.delete(holding)
+
+                user = session.query(UserAccount).filter_by(
+                    group_id=group_id, user_id=user_id
+                ).first()
+                if user:
+                    user.balance += revenue_after_fee
+                    user.total_earned += revenue_after_fee
+
+        return {
+            "success": True,
+            "msg": f"卖出成功！{code} x {amount:.2f}，成交价 {price:.2f}，手续费 {fee:.2f}，到账 {revenue_after_fee:.2f}",
+            "price": price,
+            "amount": amount,
+            "fee": fee,
+            "total": revenue_after_fee,
+        }
+
+    def get_holdings(self, group_id, user_id):
+        with self.db.session_scope() as session:
+            holdings = session.query(StockHolding).filter_by(
+                group_id=group_id, user_id=user_id
+            ).all()
+            result = []
+            for h in holdings:
+                if h.amount > 0.0001:
+                    current_price = self.prices.get(h.code, 0)
+                    market_value = h.amount * current_price
+                    profit = (current_price - h.avg_cost) * h.amount
+                    profit_pct = ((current_price - h.avg_cost) / h.avg_cost * 100) if h.avg_cost > 0 else 0
+                    result.append({
+                        "code": h.code,
+                        "amount": h.amount,
+                        "avg_cost": h.avg_cost,
+                        "current_price": current_price,
+                        "market_value": market_value,
+                        "profit": profit,
+                        "profit_pct": profit_pct,
+                    })
+        return result
+
+    def get_market_status(self):
+        status = "开市中" if self.is_open else "休市中"
+        lines = [f"📊 股市状态: {status}\n"]
+        for code, price in self.prices.items():
+            trend = self.trend_levels.get(code, 0)
+            trend_name = {3: "🔥强势上涨", 2: "📈稳步上涨", 1: "↗轻微上涨",
+                          0: "➡横盘震荡", -1: "↘轻微下跌", -2: "📉稳步下跌", -3: "💥强势下跌"}.get(trend, "➡横盘震荡")
+            lines.append(f"  {code}: {price:.2f} {trend_name}")
+        return "\n".join(lines)
+
+    def get_today_news(self, group_id):
+        with self.db.session_scope() as session:
+            now = get_china_time()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            news_list = session.query(StockNews).filter(
+                StockNews.timestamp >= today_start
+            ).order_by(StockNews.timestamp.desc()).limit(10).all()
+            # 转换为 dict 列表，避免 session 关闭后访问延迟加载属性
+            return [n.to_display_dict() for n in news_list]
+
+    def get_tech_levels(self, code):
+        tech = self.tech_states.get(code)
+        if not tech:
+            return None
+        return {
+            "support": tech.support,
+            "resistance": tech.resistance,
+            "bollinger_upper": tech.bollinger_upper,
+            "bollinger_lower": tech.bollinger_lower,
+            "bollinger_mid": tech.bollinger_mid,
+        }
