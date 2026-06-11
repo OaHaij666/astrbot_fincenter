@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star
+from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
 from .config import FinCenterConfig
@@ -22,6 +22,7 @@ from .utils import plotter
 from migrations.migrate import migrate, set_paths as set_migrate_paths
 
 
+@register("FinCenter", "FinCenter Team", "群聊财富中心 - 开户签到股市交易物资贸易", "1.0.0")
 class FinCenterPlugin(Star):
     def __init__(self, context: Context, config: dict = None):
         super().__init__(context)
@@ -201,7 +202,6 @@ class FinCenterPlugin(Star):
 
         return None
 
-    @filter.on_message_event()
     async def on_event(self, event: AstrMessageEvent):
         message = event.message_str
         if not message:
