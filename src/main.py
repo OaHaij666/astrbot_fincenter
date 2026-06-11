@@ -202,97 +202,118 @@ class FinCenterPlugin(Star):
 
         return None
 
-    async def on_event(self, event: AstrMessageEvent):
-        message = event.message_str
-        if not message:
-            return
-
-        message = message.strip()
-
+    # ---- 从消息中提取路由参数 ----
+    def _route_info(self, event: AstrMessageEvent):
         group_id = event.get_group_id() or "default"
         user_id = event.get_sender_id()
         user_name = event.get_sender_name() or user_id
-
         if not self._check_group_allowed(group_id):
-            return
-
+            return None
         group_id = self._resolve_group_id(group_id)
+        return group_id, user_id, user_name
 
-        # 非 /fc 指令：处理发言奖励和收费指令
-        if not message.startswith("/fc"):
-            self._process_chat_reward(group_id, user_id, user_name)
-            paid_msg = self._check_paid_command(message, group_id, user_id)
-            if paid_msg:
-                yield event.plain_result(paid_msg)
-            return
+    def _mkargs(self, event: AstrMessageEvent, sub: str) -> list:
+        """重建 handlers 期望的完整 args 格式 ["/fc", sub, ...]"""
+        parts = event.message_str.split()
+        if parts[0] == "/fc":
+            return parts  # 完整消息，直接返回
+        # command_group 可能剥除了前缀，手动补回
+        return ["/fc", sub] + parts
 
-        args = message.split()
-        if len(args) < 2:
-            yield event.plain_result(self._get_help_text())
-            return
+    # ---- /fc 指令组 ----
+    @filter.command_group("fc")
+    def fc(self):
+        pass
 
-        sub = args[1] if len(args) >= 2 else None
-
-        if sub == "help":
-            img_buf = await plotter.render_help_image(
-                title=f"💰 {self.config.currency.currency_name} 金融中心",
-                sections=[{
-                    'commands': [
-                        {'cmd': '/fc open', 'desc': '开户'},
-                        {'cmd': '/fc me', 'desc': '我的账户'},
-                        {'cmd': '/fc sign', 'desc': '每日签到'},
-                        {'cmd': '/fc transfer <@> <金额>', 'desc': '转账'},
-                        {'cmd': '/fc rank [条数]', 'desc': '财富排行榜'},
-                        {'cmd': '/fc stock', 'desc': '股市帮助'},
-                        {'cmd': '/fc goods', 'desc': '物资帮助'},
-                        {'cmd': '/fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
-                    ],
-                }],
-                tips=['输入 /fc <子命令> 查看详细帮助，如 /fc stock'],
-            )
-            if img_buf:
-                fd, path = tempfile.mkstemp(suffix=".png")
-                with os.fdopen(fd, 'wb') as f:
-                    f.write(img_buf.getvalue())
-                yield event.image_result(path)
-            else:
-                yield event.plain_result(self._get_help_text())
-            return
-
-        elif sub == "open":
-            async for result in self.account_handler.handle_open(event, args, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "me":
-            async for result in self.account_handler.handle_me(event, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "sign":
-            async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "transfer":
-            async for result in self.account_handler.handle_transfer(event, args, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "rank":
-            async for result in self.admin_handler.handle_rank(event, args, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "stock":
-            async for result in self.stock_handler.handle(event, args, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "goods":
-            async for result in self.goods_handler.handle(event, args, group_id, user_id, user_name):
-                yield result
-
-        elif sub == "admin":
-            async for result in self.admin_handler.handle(event, args, group_id, user_id, user_name):
-                yield result
-
+    @fc.command("help")
+    async def fc_help(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        img_buf = await plotter.render_help_image(
+            title=f"💰 {self.config.currency.currency_name} 金融中心",
+            sections=[{'commands': [
+                {'cmd': '/fc open', 'desc': '开户'},
+                {'cmd': '/fc me', 'desc': '我的账户'},
+                {'cmd': '/fc sign', 'desc': '每日签到'},
+                {'cmd': '/fc transfer <@> <金额>', 'desc': '转账'},
+                {'cmd': '/fc rank [条数]', 'desc': '财富排行榜'},
+                {'cmd': '/fc stock', 'desc': '股市帮助'},
+                {'cmd': '/fc goods', 'desc': '物资帮助'},
+                {'cmd': '/fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
+            ]}],
+            tips=['输入 /fc <子命令> 查看详细帮助，如 /fc stock'],
+        )
+        if img_buf:
+            fd, path = tempfile.mkstemp(suffix=".png")
+            with os.fdopen(fd, 'wb') as f:
+                f.write(img_buf.getvalue())
+            yield event.image_result(path)
         else:
             yield event.plain_result(self._get_help_text())
+
+    @fc.command("open")
+    async def fc_open(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.account_handler.handle_open(event, _args(event, "open"), group_id, user_id, user_name):
+            yield result
+
+    @fc.command("me")
+    async def fc_me(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.account_handler.handle_me(event, group_id, user_id, user_name):
+            yield result
+
+    @fc.command("sign")
+    async def fc_sign(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name):
+            yield result
+
+    @fc.command("transfer")
+    async def fc_transfer(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.account_handler.handle_transfer(event, _args(event, "transfer"), group_id, user_id, user_name):
+            yield result
+
+    @fc.command("rank")
+    async def fc_rank(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.admin_handler.handle_rank(event, _args(event, "rank"), group_id, user_id, user_name):
+            yield result
+
+    @fc.command("stock")
+    async def fc_stock(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.stock_handler.handle(event, _args(event, "stock"), group_id, user_id, user_name):
+            yield result
+
+    @fc.command("goods")
+    async def fc_goods(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.goods_handler.handle(event, _args(event, "goods"), group_id, user_id, user_name):
+            yield result
+
+    @fc.command("admin")
+    async def fc_admin(self, event: AstrMessageEvent):
+        info = self._route_info(event)
+        if not info: return
+        group_id, user_id, user_name = info
+        async for result in self.admin_handler.handle(event, _args(event, "admin"), group_id, user_id, user_name):
+            yield result
 
     def _get_help_text(self):
         currency_name = self.config.currency.currency_name
