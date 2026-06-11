@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 800px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #ebf5ff 0%, #fafcff 100%);
+    padding: 16px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(220, 238, 250, 0.8);
+    border-radius: 12px;
+    padding: 14px 20px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .title-bar h1 {
+    font-size: 26px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .title-bar .deco {
+    font-size: 11px;
+    color: #b8d4e8;
+    margin-top: 2px;
+  }
+  .card {
+    background: rgba(255,255,255,0.95);
+    border: 2px solid rgba(170,210,240,0.7);
+    border-radius: 16px;
+    box-shadow: 0 3px 12px rgba(190,210,235,0.15);
+    padding: 20px;
+    position: relative;
+  }
+  .card::before, .card::after {
+    content: '';
+    position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(180,215,240,0.6);
+  }
+  .card::before { top: 12px; left: 12px; }
+  .card::after { bottom: 12px; right: 12px; }
+  .section {
+    margin-bottom: 16px;
+  }
+  .section-divider {
+    text-align: center;
+    color: #b8d4e8;
+    font-size: 12px;
+    margin: 10px 0 6px;
+    position: relative;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 35%;
+    height: 1px;
+    background: #b8d4e8;
+  }
+  .section-divider::before { left: 0; }
+  .section-divider::after { right: 0; }
+  .section-title {
+    font-size: 20px;
+    color: #5b8db8;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .header-row {
+    font-size: 15px;
+    color: #8aa9c4;
+    font-weight: 600;
+    padding: 4px 0;
+    border-bottom: 1px solid #e8eff5;
+    margin-bottom: 4px;
+    display: flex;
+  }
+  .header-row span { flex: 1; text-align: right; }
+  .header-row span:first-child { text-align: left; }
+  .data-row {
+    font-size: 15px;
+    padding: 4px 0;
+    display: flex;
+  }
+  .data-row span { flex: 1; text-align: right; }
+  .data-row span:first-child { text-align: left; }
+  .up { color: #ff8a9c; }
+  .down { color: #6fc1d9; }
+  .neutral { color: #aab8c5; }
+  .news-item {
+    font-size: 13px;
+    color: #7a8fa5;
+    padding: 3px 0;
+    line-height: 1.5;
+  }
+  .kline-section {
+    margin-top: 12px;
+  }
+  .kline-label {
+    display: inline-block;
+    background: rgba(210,233,250,0.85);
+    color: #4a7fa8;
+    font-size: 13px;
+    padding: 3px 14px;
+    border-radius: 13px;
+    margin-bottom: 8px;
+  }
+  .kline-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #7ec8e3;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .kline-chart {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>📊 股市总览</h1>
+    <div class="deco">✧ ✦ &nbsp; ✦ ✧</div>
+  </div>
+
+  <div class="card">
+    <!-- 行情 -->
+    <div class="section">
+      <div class="section-divider">✦</div>
+      <div class="section-title">📈 行情</div>
+      <div class="header-row">
+        <span>代码</span><span>最新价</span><span>涨跌幅</span><span>趋势</span>
+      </div>
+      {% for item in market_data %}
+      <div class="data-row">
+        <span>{{ item.code }}</span>
+        <span>{{ "%.2f"|format(item.price) }}</span>
+        <span class="{{ 'up' if item.change > 0 else ('down' if item.change < 0 else 'neutral') }}">
+          {{ "+" if item.change > 0 else "" }}{{ "%.2f"|format(item.change) }}%
+        </span>
+        <span>{{ "📈" if item.trend > 0 else ("📉" if item.trend < 0 else "➡️") }}</span>
+      </div>
+      {% else %}
+      <div class="data-row neutral">暂无数据</div>
+      {% endfor %}
+    </div>
+
+    <!-- 持仓 -->
+    {% if holdings %}
+    <div class="section">
+      <div class="section-divider">✦</div>
+      <div class="section-title">💼 我的持仓</div>
+      <div class="header-row">
+        <span>代码</span><span>数量</span><span>成本</span><span>现价</span><span>盈亏</span>
+      </div>
+      {% for h in holdings %}
+      <div class="data-row">
+        <span>{{ h.code }}</span>
+        <span>{{ "%.2f"|format(h.amount) }}</span>
+        <span>{{ "%.2f"|format(h.avg_cost) }}</span>
+        <span>{{ "%.2f"|format(h.price) }}</span>
+        <span class="{{ 'up' if h.profit > 0 else ('down' if h.profit < 0 else 'neutral') }}">
+          {{ "+" if h.profit > 0 else "" }}{{ "%.2f"|format(h.profit) }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 新闻 -->
+    {% if news %}
+    <div class="section">
+      <div class="section-divider">✦</div>
+      <div class="section-title">📰 市场新闻</div>
+      {% for n in news[:5] %}
+      <div class="news-item">✦ {{ n.content }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- K线图 -->
+    {% if kline_images %}
+    {% for code, img_b64 in kline_images.items() %}
+    <div class="kline-section">
+      <div class="kline-label">{{ code }} K线</div>
+      <div class="kline-chart">
+        <img src="data:image/png;base64,{{ img_b64 }}" style="width:100%;display:block;" />
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</body>
+</html>

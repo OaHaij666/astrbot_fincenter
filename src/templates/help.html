@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 600px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #eef3ff 0%, #fafcff 100%);
+    padding: 20px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(215, 232, 248, 0.8);
+    border-radius: 14px;
+    padding: 14px 20px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .title-bar h1 {
+    font-size: 26px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .title-bar .deco {
+    font-size: 11px;
+    color: #b8d4e8;
+    margin-top: 2px;
+  }
+  .card {
+    background: rgba(255,255,255,0.95);
+    border: 2px solid rgba(170,210,240,0.7);
+    border-radius: 16px;
+    box-shadow: 0 3px 12px rgba(190,210,235,0.15);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  .section-divider {
+    text-align: center;
+    color: #b8d4e8;
+    font-size: 12px;
+    margin: 8px 0 6px;
+    position: relative;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 38%;
+    height: 1px;
+    background: #b8d4e8;
+  }
+  .section-divider::before { left: 0; }
+  .section-divider::after { right: 0; }
+  .section-title {
+    font-size: 18px;
+    color: #5b8db8;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .cmd-row {
+    display: flex;
+    align-items: baseline;
+    padding: 7px 0;
+    border-radius: 6px;
+  }
+  .cmd-row.even { background: rgba(245,249,255,0.6); }
+  .cmd-cmd {
+    font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
+    font-size: 14px;
+    color: #4a7fa8;
+    font-weight: 600;
+    min-width: 260px;
+    padding-right: 14px;
+  }
+  .cmd-desc {
+    font-size: 14px;
+    color: #7a8fa5;
+    flex: 1;
+  }
+  .cmd-tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 600;
+  }
+  .tag-admin { background: rgba(255,138,156,0.15); color: #e87a8a; }
+  .tip-box {
+    background: rgba(210,233,250,0.5);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #7a8fa5;
+    line-height: 1.5;
+  }
+  .tip-box .tip-dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #7ec8e3;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>{{ title }}</h1>
+    <div class="deco">— ✦ &nbsp; · &nbsp; ✦ &nbsp; · &nbsp; ✦ —</div>
+  </div>
+
+  <div class="card">
+    {% for section in sections %}
+    {% if section.section_name %}
+    <div class="section-divider">✦</div>
+    <div class="section-title">{{ section.section_name }}</div>
+    {% endif %}
+    {% for cmd in section.commands %}
+    <div class="cmd-row {{ 'even' if loop.index0 % 2 == 0 else '' }}">
+      <span class="cmd-cmd">{{ cmd.cmd }}</span>
+      <span class="cmd-desc">
+        {{ cmd.desc }}
+        {% if cmd.admin %}<span class="cmd-tag tag-admin">管理</span>{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+    {% endfor %}
+
+    {% if tips %}
+    <div class="tip-box">
+      {% for tip in tips %}
+      <div><span class="tip-dot"></span>{{ tip }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if quick_ref %}
+  <div class="card">
+    <div class="section-divider">✦</div>
+    <div class="section-title">📋 子菜单</div>
+    {% for ref in quick_ref %}
+    <div class="cmd-row">
+      <span class="cmd-cmd">{{ ref.cmd }}</span>
+      <span class="cmd-desc">{{ ref.desc }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</body>
+</html>

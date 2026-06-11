@@ -29,7 +29,24 @@ class GoodsHandler:
         sub = args[2] if len(args) >= 3 else None
 
         if sub is None:
-            yield event.plain_result(self._get_goods_help())
+            img_buf = await plotter.render_help_image(
+                title="📦 物资指令",
+                sections=[{
+                    'commands': [
+                        {'cmd': '/fc goods market', 'desc': '物资市场总览（图文卡片）'},
+                        {'cmd': '/fc goods buy <ID> <数量>', 'desc': '买入物资'},
+                        {'cmd': '/fc goods sell <ID> <数量>', 'desc': '卖出物资'},
+                        {'cmd': '/fc goods backpack', 'desc': '查看我的背包'},
+                    ],
+                }],
+                tips=['物资价格会定期刷新，请注意市场波动'],
+            )
+            if img_buf:
+                path = self._save_temp_image(img_buf)
+                if path:
+                    yield event.image_result(path)
+                    return
+            yield event.plain_result(self._get_goods_help_text())
             return
 
         sub = args[2]
@@ -39,14 +56,17 @@ class GoodsHandler:
             backpack = self.plugin.goods_market.get_backpack(group_id, user_id)
             stock_data = {b['goods_id']: b['amount'] for b in backpack}
 
-            img_buf = plotter.render_goods_market_image(
+            img_buf = await plotter.render_goods_market_image(
                 goods_list, stock_data,
                 self.plugin.config.currency.currency_name,
                 self.plugin.config.currency.currency_icon,
             )
-            img_path = self._save_temp_image(img_buf)
-            if img_path:
-                yield event.image_result(img_path)
+            if img_buf:
+                img_path = self._save_temp_image(img_buf)
+                if img_path:
+                    yield event.image_result(img_path)
+                else:
+                    yield event.plain_result("图片生成失败")
             else:
                 yield event.plain_result("图片生成失败")
 
@@ -83,7 +103,7 @@ class GoodsHandler:
         else:
             yield event.plain_result("未知物资指令")
 
-    def _get_goods_help(self):
+    def _get_goods_help_text(self):
         lines = [
             "📦 物资指令",
             "━━━━━━━━━━━━━━",

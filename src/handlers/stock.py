@@ -3,9 +3,9 @@
 处理股市查看、买卖、K线图、新闻等指令。
 ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给绘图和展示层。
 """
-import asyncio
 import os
 import tempfile
+import asyncio
 
 from ..core.database import StockHistory, get_china_time
 from ..utils import plotter
@@ -15,7 +15,7 @@ class StockHandler:
     def __init__(self, plugin):
         self.plugin = plugin
 
-    def _build_market_image(self, group_id, user_id):
+    async def _build_market_image(self, group_id, user_id):
         if not self.plugin.stock_market:
             return None
 
@@ -62,10 +62,9 @@ class StockHandler:
                     code=code
                 ).order_by(StockHistory.timestamp.desc()).limit(fetch_limit).all()
                 if history:
-                    # ORM -> dict 转换，避免 session 关闭后延迟加载
                     history_dicts = [h.to_kline_dict() for h in reversed(history)]
                     tech_levels = self.plugin.stock_market.get_tech_levels(code)
-                    kline_buf = plotter.plot_kline(
+                    kline_buf = await plotter.plot_kline(
                         history_dicts, title=f"{code} K线走势",
                         tech_levels=tech_levels,
                         max_candles=self.plugin.config.stock.stock_kline_candles,
@@ -74,7 +73,7 @@ class StockHandler:
                     if kline_buf:
                         kline_images[code] = kline_buf
 
-        img_buf = plotter.render_stock_market_image(
+        img_buf = await plotter.render_stock_market_image(
             market_data, holdings_data, news_data,
             self.plugin.config.currency.currency_name,
             self.plugin.config.currency.currency_icon,
@@ -87,19 +86,18 @@ class StockHandler:
                 pass
         return img_buf
 
-    def _build_kline_image(self, code, limit):
+    async def _build_kline_image(self, code, limit):
         with self.plugin.db.session_scope() as session:
             history = session.query(StockHistory).filter_by(
                 code=code
             ).order_by(StockHistory.timestamp.desc()).limit(limit).all()
-            # ORM -> dict 转换
             history_dicts = [h.to_kline_dict() for h in reversed(history)]
 
         if not history_dicts:
             return None
 
         tech_levels = self.plugin.stock_market.get_tech_levels(code)
-        return plotter.plot_kline(
+        return await plotter.plot_kline(
             history_dicts, title=f"{code} K线走势",
             tech_levels=tech_levels,
             font_key=self.plugin.config.stock.stock_font,
@@ -122,16 +120,33 @@ class StockHandler:
         sub = args[2] if len(args) >= 3 else None
 
         if sub is None:
-            yield event.plain_result(self._get_stock_help())
+            img_buf = await plotter.render_help_image(
+                title="📈 股市指令",
+                sections=[{
+                    'commands': [
+                        {'cmd': '/fc stock market', 'desc': '股市总览（行情+持仓+K线+新闻）'},
+                        {'cmd': '/fc stock buy <代码> <数量>', 'desc': '买入股票'},
+                        {'cmd': '/fc stock sell <代码> <数量>', 'desc': '卖出股票'},
+                        {'cmd': '/fc stock assets', 'desc': '查看我的持仓'},
+                        {'cmd': '/fc stock kline <代码> [条数]', 'desc': '查看K线图（默认60条）'},
+                        {'cmd': '/fc stock news', 'desc': '查看市场新闻'},
+                        {'cmd': '/fc stock event [代码]', 'desc': '手动触发市场事件', 'admin': True},
+                    ],
+                }],
+                tips=[f'代码列表请先查看 /fc stock market，买入前建议先看K线'],
+            )
+            if img_buf:
+                path = self._save_temp_image(img_buf)
+                if path:
+                    yield event.image_result(path)
+                    return
+            yield event.plain_result(self._get_stock_help_text())
             return
 
         sub = args[2]
 
         if sub == "market":
-            loop = asyncio.get_event_loop()
-            img_buf = await loop.run_in_executor(
-                None, self._build_market_image, group_id, user_id
-            )
+            img_buf = await self._build_market_image(group_id, user_id)
             if img_buf:
                 img_path = self._save_temp_image(img_buf)
                 if img_path:
@@ -200,10 +215,7 @@ class StockHandler:
                 except ValueError:
                     pass
 
-            loop = asyncio.get_event_loop()
-            img_buf = await loop.run_in_executor(
-                None, self._build_kline_image, code, limit
-            )
+            img_buf = await self._build_kline_image(code, limit)
             if img_buf:
                 img_path = self._save_temp_image(img_buf)
                 if img_path:
@@ -256,7 +268,7 @@ class StockHandler:
         else:
             yield event.plain_result("未知股市指令")
 
-    def _get_stock_help(self):
+    def _get_stock_help_text(self):
         lines = [
             "📈 股市指令",
             "━━━━━━━━━━━━━━",

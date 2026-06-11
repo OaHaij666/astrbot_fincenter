@@ -16,11 +16,14 @@ cankao/
 *.sqlite
 *.sqlite3
 
-# Runtime data
+# Runtime data / cache
 data/cache/
 data/backups/
 !data/cache/.gitkeep
 !data/backups/.gitkeep
+
+# Downloaded vendor JS
+assets/js/
 
 # Config state
 .cross_group_config
@@ -56,10 +59,3 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
-
-# Uploaded images
-goods_images/
-temp_images/
-
-# Image cache
-.image_cache/

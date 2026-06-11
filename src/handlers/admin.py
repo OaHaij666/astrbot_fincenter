@@ -15,6 +15,15 @@ class AdminHandler:
     def __init__(self, plugin):
         self.plugin = plugin
 
+    def _save_temp_image(self, buf):
+        try:
+            fd, path = tempfile.mkstemp(suffix=".png")
+            with os.fdopen(fd, 'wb') as f:
+                f.write(buf.getvalue())
+            return path
+        except Exception:
+            return None
+
     async def handle(self, event, args, group_id, user_id, user_name):
         if str(user_id) not in self.plugin.config.basic.admin_ids:
             yield event.plain_result("仅限管理员使用")
@@ -23,7 +32,43 @@ class AdminHandler:
         sub = args[2] if len(args) >= 3 else None
 
         if sub is None:
-            yield event.plain_result(self._get_admin_help())
+            img_buf = await plotter.render_help_image(
+                title="⚙️ 管理员指令",
+                sections=[
+                    {
+                        'section_name': '💰 余额管理',
+                        'commands': [
+                            {'cmd': '/fc admin balance <@> <金额>', 'desc': '为用户增减余额'},
+                            {'cmd': '/fc admin setbalance <@> <金额>', 'desc': '直接设置用户余额'},
+                        ],
+                    },
+                    {
+                        'section_name': '📈 股市控制',
+                        'commands': [
+                            {'cmd': '/fc admin stock open', 'desc': '强制开市'},
+                            {'cmd': '/fc admin stock close', 'desc': '强制休市'},
+                            {'cmd': '/fc admin stock auto', 'desc': '恢复自动模式'},
+                        ],
+                    },
+                    {
+                        'section_name': '📦 物资管理',
+                        'commands': [
+                            {'cmd': '/fc admin goods add <ID> <名称> <价>', 'desc': '添加物资'},
+                            {'cmd': '/fc admin goods remove <物资ID>', 'desc': '移除物资'},
+                            {'cmd': '/fc admin goods setprice <ID> <价>', 'desc': '设置价格'},
+                            {'cmd': '/fc admin goods setvolatility <ID> <率>', 'desc': '设置波动率'},
+                            {'cmd': '/fc admin goods reset', 'desc': '重置所有物资价格至基准价'},
+                        ],
+                    },
+                ],
+                tips=['上述指令仅限管理员使用，@用户 可直接用 QQ号'],
+            )
+            if img_buf:
+                path = self._save_temp_image(img_buf)
+                if path:
+                    yield event.image_result(path)
+                    return
+            yield event.plain_result(self._get_admin_help_text())
             return
 
         sub = args[2]
@@ -261,18 +306,22 @@ class AdminHandler:
 
         rank_data.sort(key=lambda x: x['total_wealth'], reverse=True)
 
-        img_buf = plotter.render_rank_image(
+        img_buf = await plotter.render_rank_image(
             rank_data,
             self.plugin.config.currency.currency_name,
             self.plugin.config.currency.currency_icon,
         )
 
-        fd, path = tempfile.mkstemp(suffix=".png")
-        with os.fdopen(fd, 'wb') as f:
-            f.write(img_buf.getvalue())
-        yield event.image_result(path)
+        if img_buf:
+            path = self._save_temp_image(img_buf)
+            if path:
+                yield event.image_result(path)
+            else:
+                yield event.plain_result("排行榜图片生成失败")
+        else:
+            yield event.plain_result("排行榜图片生成失败")
 
-    def _get_admin_help(self):
+    def _get_admin_help_text(self):
         lines = [
             "⚙️ 管理员指令",
             "━━━━━━━━━━━━━━",

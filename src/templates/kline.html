@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<script src="{{ echarts_path }}"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: #f5f9ff;
+    padding: 12px;
+  }
+  #kline {
+    width: 760px;
+    height: 620px;
+  }
+</style>
+</head>
+<body>
+  <div id="kline"></div>
+  <script>
+    var chart = echarts.init(document.getElementById('kline'));
+
+    // 解析数据
+    var dates = {{ dates | tojson }};
+    var ohlc = {{ ohlc | tojson }};
+    var volumes = {{ volumes | tojson }};
+    var ma5_in = {{ ma5 | tojson }};
+    var ma20_in = {{ ma20 | tojson }};
+
+    var closes = ohlc.map(function(d) { return d[1]; });
+
+    // ===== MA 均线 =====
+    function calcMA(data, period) {
+      var result = [];
+      for (var i = 0; i < data.length; i++) {
+        if (i < period - 1) { result.push('-'); continue; }
+        var sum = 0;
+        for (var j = 0; j < period; j++) sum += data[i - j];
+        result.push(+(sum / period).toFixed(4));
+      }
+      return result;
+    }
+
+    var ma5  = ma5_in.length > 0 ? ma5_in  : calcMA(closes, 5);
+    var ma20 = ma20_in.length > 0 ? ma20_in : calcMA(closes, 20);
+
+    // ===== BOLL 布林带 =====
+    function calcBOLL(data, period) {
+      var mid = calcMA(data, period);
+      var upper = [], lower = [];
+      for (var i = 0; i < data.length; i++) {
+        if (mid[i] === '-') { upper.push('-'); lower.push('-'); continue; }
+        var sum = 0, n = Math.min(period, i + 1);
+        for (var j = 0; j < n; j++) {
+          sum += Math.pow(data[i - j] - mid[i], 2);
+        }
+        var std = Math.sqrt(sum / n);
+        upper.push(+(mid[i] + 2 * std).toFixed(4));
+        lower.push(+(mid[i] - 2 * std).toFixed(4));
+      }
+      return { mid: mid, upper: upper, lower: lower };
+    }
+    var boll = calcBOLL(closes, 20);
+
+    // ===== MACD =====
+    function calcEMA(data, period) {
+      var result = [];
+      var k = 2 / (period + 1);
+      for (var i = 0; i < data.length; i++) {
+        if (i === 0) {
+          result.push(data[0]);
+        } else {
+          result.push(+(data[i] * k + result[i - 1] * (1 - k)).toFixed(4));
+        }
+      }
+      return result;
+    }
+    var ema12 = calcEMA(closes, 12);
+    var ema26 = calcEMA(closes, 26);
+    var dif = ema12.map(function(v, i) { return +(v - ema26[i]).toFixed(4); });
+    var dea = calcEMA(dif, 9);
+    var macdBar = dif.map(function(v, i) { return +(2 * (v - dea[i])).toFixed(4); });
+
+    // ===== 成交量均线 =====
+    var volMa5 = calcMA(volumes, 5);
+
+    // ===== 颜色常量 =====
+    var UP   = '#ff8a9c', UP_W  = '#e87a8a';
+    var DOWN = '#6fc1d9', DOWN_W = '#5ab0c9';
+    var MA5_C   = '#c8a0e0';
+    var MA20_C  = '#7ec8e3';
+    var BOLL_C  = 'rgba(180,160,200,0.5)';
+    var DIF_C   = '#ff8a9c';
+    var DEA_C   = '#6fc1d9';
+
+    var option = {
+      backgroundColor: '#f5f9ff',
+      animation: false,
+      title: {
+        text: '{{ title }}',
+        left: 'center',
+        textStyle: { color: '#4a7fa8', fontSize: 15, fontWeight: 'bold' }
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        borderColor: '#b8d4e8',
+        textStyle: { color: '#4a5b6e', fontSize: 11 }
+      },
+      legend: {
+        data: ['MA5','MA20','BOLL','MACD'],
+        top: 28, left: 'center',
+        textStyle: { color: '#7a8fa5', fontSize: 10 },
+        itemWidth: 14, itemHeight: 8
+      },
+      // 三栏网格：主图 | 成交量 | MACD
+      grid: [
+        { left: '8%', right: '3%', top: '11%', height: '42%' },
+        { left: '8%', right: '3%', top: '57%', height: '12%' },
+        { left: '8%', right: '3%', top: '73%', height: '18%' }
+      ],
+      xAxis: [
+        { type: 'category', data: dates, gridIndex: 0,
+          axisLine: { lineStyle: { color: '#c8d8e8' } },
+          axisLabel: { color: '#a0b8cc', fontSize: 9 } },
+        { type: 'category', data: dates, gridIndex: 1,
+          axisLine: { lineStyle: { color: '#c8d8e8' } },
+          axisLabel: { show: false } },
+        { type: 'category', data: dates, gridIndex: 2,
+          axisLine: { lineStyle: { color: '#c8d8e8' } },
+          axisLabel: { color: '#a0b8cc', fontSize: 9 } }
+      ],
+      yAxis: [
+        { scale: true, gridIndex: 0, position: 'right',
+          axisLine: { lineStyle: { color: '#c8d8e8' } },
+          axisLabel: { color: '#a0b8cc', fontSize: 9 },
+          splitLine: { lineStyle: { color: '#e8eff5' } } },
+        { scale: true, gridIndex: 1,
+          axisLine: { lineStyle: { color: '#c8d8e8' } },
+          axisLabel: { color: '#a0b8cc', fontSize: 9 },
+          splitLine: { show: false } },
+        { scale: true, gridIndex: 2, position: 'right',
+          axisLine: { lineStyle: { color: '#c8d8e8' } },
+          axisLabel: { color: '#a0b8cc', fontSize: 9 },
+          splitLine: { lineStyle: { color: '#e8eff5' } } }
+      ],
+      dataZoom: [
+        { type: 'inside', xAxisIndex: [0,1,2], start: 0, end: 100 }
+      ],
+      series: [
+        // ---------- 主图：K线 ----------
+        { name: 'K线', type: 'candlestick', data: ohlc,
+          xAxisIndex: 0, yAxisIndex: 0,
+          itemStyle: { color: UP, color0: DOWN, borderColor: UP_W, borderColor0: DOWN_W } },
+
+        // 主图：MA5
+        { name: 'MA5', type: 'line', data: ma5, smooth: true, showSymbol: false,
+          lineStyle: { color: MA5_C, width: 1 }, xAxisIndex: 0, yAxisIndex: 0 },
+
+        // 主图：MA20
+        { name: 'MA20', type: 'line', data: ma20, smooth: true, showSymbol: false,
+          lineStyle: { color: MA20_C, width: 1 }, xAxisIndex: 0, yAxisIndex: 0 },
+
+        // 主图：BOLL 上轨
+        { name: 'BOLL', type: 'line', data: boll.upper, smooth: true, showSymbol: false,
+          lineStyle: { color: BOLL_C, width: 1, type: 'dashed' }, xAxisIndex: 0, yAxisIndex: 0,
+          areaStyle: { color: 'rgba(200,180,220,0.04)' } },
+
+        // 主图：BOLL 下轨
+        { name: 'BOLL', type: 'line', data: boll.lower, smooth: true, showSymbol: false,
+          lineStyle: { color: BOLL_C, width: 1, type: 'dashed' }, xAxisIndex: 0, yAxisIndex: 0 },
+
+        // ---------- 副图1：成交量 ----------
+        { name: '成交量', type: 'bar',
+          data: volumes.map(function(v, i) {
+            return { value: v,
+              itemStyle: { color: ohlc[i][1] >= ohlc[i][0] ? UP : DOWN } };
+          }),
+          xAxisIndex: 1, yAxisIndex: 1 },
+
+        // 副图1：成交量MA5
+        { name: 'VOL_MA5', type: 'line', data: volMa5, smooth: true, showSymbol: false,
+          lineStyle: { color: '#c8a0e0', width: 0.8 }, xAxisIndex: 1, yAxisIndex: 1 },
+
+        // ---------- 副图2：MACD ----------
+        { name: 'MACD', type: 'bar',
+          data: macdBar.map(function(v, i) {
+            return { value: v,
+              itemStyle: { color: v >= 0 ? UP : DOWN } };
+          }),
+          xAxisIndex: 2, yAxisIndex: 2 },
+
+        // 副图2：DIF 快线
+        { name: 'MACD', type: 'line', data: dif, smooth: true, showSymbol: false,
+          lineStyle: { color: DIF_C, width: 1 }, xAxisIndex: 2, yAxisIndex: 2 },
+
+        // 副图2：DEA 慢线
+        { name: 'MACD', type: 'line', data: dea, smooth: true, showSymbol: false,
+          lineStyle: { color: DEA_C, width: 1 }, xAxisIndex: 2, yAxisIndex: 2 }
+
+        {% if support_levels %}
+        {% for s in support_levels %}
+        ,{ name: '支撑 {{ s }}', type: 'line',
+          markLine: { silent: true, symbol: 'none',
+            lineStyle: { color: DOWN, type: 'dotted', width: 1 },
+            data: [{ yAxis: {{ s }} }],
+            label: { formatter: '支撑 {{ s }}', color: DOWN, fontSize: 9,
+              backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
+          xAxisIndex: 0, yAxisIndex: 0, data: [] }
+        {% endfor %}
+        {% endif %}
+        {% if resistance_levels %}
+        {% for r in resistance_levels %}
+        ,{ name: '阻力 {{ r }}', type: 'line',
+          markLine: { silent: true, symbol: 'none',
+            lineStyle: { color: UP, type: 'dotted', width: 1 },
+            data: [{ yAxis: {{ r }} }],
+            label: { formatter: '阻力 {{ r }}', color: UP, fontSize: 9,
+              backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
+          xAxisIndex: 0, yAxisIndex: 0, data: [] }
+        {% endfor %}
+        {% endif %}
+      ]
+    };
+
+    chart.setOption(option);
+  </script>
+</body>
+</html>

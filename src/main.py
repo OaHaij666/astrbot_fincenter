@@ -5,6 +5,7 @@
 """
 import asyncio
 import os
+import tempfile
 import logging
 from typing import Any
 
@@ -242,7 +243,30 @@ class FinCenterPlugin:
         sub = args[1] if len(args) >= 2 else None
 
         if sub == "help":
-            yield event.plain_result(self._get_help())
+            img_buf = await plotter.render_help_image(
+                title=f"💰 {self.config.currency.currency_name} 金融中心",
+                sections=[{
+                    'commands': [
+                        {'cmd': '/fc open', 'desc': '开户'},
+                        {'cmd': '/fc me', 'desc': '我的账户'},
+                        {'cmd': '/fc sign', 'desc': '每日签到'},
+                        {'cmd': '/fc transfer <@> <金额>', 'desc': '转账'},
+                        {'cmd': '/fc rank [条数]', 'desc': '财富排行榜'},
+                        {'cmd': '/fc stock', 'desc': '股市帮助'},
+                        {'cmd': '/fc goods', 'desc': '物资帮助'},
+                        {'cmd': '/fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
+                    ],
+                }],
+                tips=[f'输入 /fc <子命令> 查看详细帮助，如 /fc stock'],
+            )
+            if img_buf:
+                fd, path = tempfile.mkstemp(suffix=".png")
+                with os.fdopen(fd, 'wb') as f:
+                    f.write(img_buf.getvalue())
+                yield event.image_result(path)
+            else:
+                yield event.plain_result(self._get_help_text())
+            return
 
         elif sub == "open":
             async for result in self.account_handler.handle_open(event, args, group_id, user_id, user_name):
@@ -277,9 +301,9 @@ class FinCenterPlugin:
                 yield result
 
         else:
-            yield event.plain_result(self._get_help())
+            yield event.plain_result(self._get_help_text())
 
-    def _get_help(self):
+    def _get_help_text(self):
         currency_name = self.config.currency.currency_name
         currency_icon = self.config.currency.currency_icon
         lines = [
@@ -307,6 +331,15 @@ class FinCenterPlugin:
         if self.goods_market:
             self.goods_market.stop()
             logger.info("Goods market stopped")
+        # 关闭 Playwright 浏览器
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(plotter.shutdown())
+            else:
+                loop.run_until_complete(plotter.shutdown())
+        except Exception:
+            pass
 
     def __del__(self):
         self.shutdown()

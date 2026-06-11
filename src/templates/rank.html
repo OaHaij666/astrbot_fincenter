@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 600px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #eef3ff 0%, #f8faff 100%);
+    padding: 16px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(215, 232, 248, 0.75);
+    border-radius: 14px;
+    padding: 12px 20px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .title-bar h1 {
+    font-size: 28px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .title-bar .deco {
+    font-size: 11px;
+    color: #b8d4e8;
+    margin-top: 2px;
+  }
+
+  /* TOP 1-3 领奖台 */
+  .podium-card {
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .podium-card.gold {
+    background: rgba(255,248,220,0.85);
+    border: 2px solid rgba(255,200,50,0.85);
+    box-shadow: 0 0 20px rgba(255,215,0,0.15);
+  }
+  .podium-card.silver {
+    background: rgba(240,244,248,0.85);
+    border: 2px solid rgba(180,195,210,0.85);
+    box-shadow: 0 0 15px rgba(192,192,192,0.1);
+  }
+  .podium-card.bronze {
+    background: rgba(255,240,225,0.85);
+    border: 2px solid rgba(210,160,100,0.85);
+    box-shadow: 0 0 15px rgba(205,127,50,0.1);
+  }
+  .podium-card .left-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 6px;
+    border-radius: 16px 0 0 16px;
+  }
+  .podium-card.gold .left-bar { background: rgba(255,200,50,0.85); }
+  .podium-card.silver .left-bar { background: rgba(180,195,210,0.85); }
+  .podium-card.bronze .left-bar { background: rgba(210,160,100,0.85); }
+
+  .rank-badge {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .podium-card.gold .rank-badge {
+    background: rgba(255,200,50,0.85);
+    color: #B8860B;
+  }
+  .podium-card.silver .rank-badge {
+    background: rgba(180,195,210,0.85);
+    color: #808080;
+  }
+  .podium-card.bronze .rank-badge {
+    background: rgba(210,160,100,0.85);
+    color: #8B5A2B;
+  }
+  .podium-info {
+    flex: 1;
+  }
+  .podium-name {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .podium-card.gold .podium-name { color: #B8860B; }
+  .podium-card.silver .podium-name { color: #808080; }
+  .podium-card.bronze .podium-name { color: #8B5A2B; }
+  .podium-wealth {
+    font-size: 16px;
+    font-weight: 700;
+    color: #4a5b6e;
+  }
+  .podium-medal {
+    font-size: 32px;
+    flex-shrink: 0;
+  }
+  .crown {
+    text-align: center;
+    font-size: 16px;
+    margin-bottom: -4px;
+  }
+
+  /* 分隔线 */
+  .section-divider {
+    text-align: center;
+    color: #b8d4e8;
+    font-size: 12px;
+    margin: 12px 0 8px;
+    position: relative;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 35%;
+    height: 1px;
+    background: #b8d4e8;
+  }
+  .section-divider::before { left: 0; }
+  .section-divider::after { right: 0; }
+
+  /* TOP 4+ 列表 */
+  .list-header {
+    display: flex;
+    padding: 4px 16px;
+    font-size: 13px;
+    color: #8aa9c4;
+    font-weight: 600;
+  }
+  .list-header .col-rank { width: 60px; }
+  .list-header .col-name { flex: 1; }
+  .list-header .col-wealth { text-align: right; }
+
+  .list-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    font-size: 15px;
+    border-radius: 8px;
+  }
+  .list-row.even {
+    background: rgba(240,247,255,0.5);
+  }
+  .list-row .col-rank {
+    width: 60px;
+    font-weight: 700;
+    color: #7a8fa5;
+    text-align: center;
+  }
+  .list-row .col-name { flex: 1; }
+  .list-row .col-wealth {
+    text-align: right;
+    color: #7a8fa5;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>🏆 财富排行榜</h1>
+    <div class="deco">— ✦ &nbsp; · &nbsp; ✦ &nbsp; · &nbsp; ✦ —</div>
+  </div>
+
+  {% set top3 = rank_data[:3] %}
+  {% set rest = rank_data[3:] %}
+
+  {% for r in top3 %}
+  {% if loop.index0 == 0 %}
+  <div class="crown">👑</div>
+  {% endif %}
+  <div class="podium-card {{ ['gold','silver','bronze'][loop.index0] }}">
+    <div class="left-bar"></div>
+    <div class="rank-badge">{{ loop.index }}</div>
+    <div class="podium-info">
+      <div class="podium-name">{{ r.user_name }}</div>
+      <div class="podium-wealth">{{ currency_icon }} {{ "%.2f"|format(r.total_wealth) }} {{ currency_name }}</div>
+    </div>
+    <div class="podium-medal">{{ ["🥇","🥈","🥉"][loop.index0] }}</div>
+  </div>
+  {% endfor %}
+
+  {% if rest %}
+  <div class="section-divider">✦</div>
+  <div class="list-header">
+    <div class="col-rank">排名</div>
+    <div class="col-name">用户</div>
+    <div class="col-wealth">财富</div>
+  </div>
+  {% for r in rest %}
+  <div class="list-row {{ 'even' if loop.index0 % 2 == 0 else '' }}">
+    <div class="col-rank">{{ loop.index + 3 }}</div>
+    <div class="col-name">{{ r.user_name }}</div>
+    <div class="col-wealth">{{ "%.2f"|format(r.total_wealth) }}</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</body>
+</html>
