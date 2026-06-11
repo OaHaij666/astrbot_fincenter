@@ -10,6 +10,7 @@ htmlcov/
 
 # Reference code
 cankao/
+astrbot_TierMem/
 
 # Database
 *.db
