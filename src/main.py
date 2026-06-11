@@ -3,15 +3,11 @@
 提供 AstrBot 插件入口，负责配置解析、数据库初始化、
 市场引擎生命周期管理和指令路由。
 """
-import asyncio
 import os
-import tempfile
-import logging
-from typing import Any
 
-from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from astrbot.api.event import AstrMessageEvent, filter
 
 from .config import FinCenterConfig
 from .core.database import DB, ChatRewardState, UserAccount, PaidCommand, get_china_time
@@ -33,6 +29,29 @@ class FinCenterPlugin(Star):
         self._setup_database()
         self._setup_handlers()
         self._setup_markets()
+
+    # ── 辅助方法 ──────────────────────────────────────────────
+
+    def _extract_group_id(self, event: AstrMessageEvent) -> str:
+        """从 unified_msg_origin 提取群号，私聊场景回退到 user_id"""
+        origin = getattr(event, "unified_msg_origin", "") or ""
+        parts = origin.split(":")
+        if len(parts) >= 3 and "Group" in parts[1]:
+            group_id = parts[2]
+        else:
+            group_id = str(event.get_sender_id())
+        return self._resolve_group_id(group_id)
+
+    def _get_user_name(self, event: AstrMessageEvent) -> str:
+        """从 event 获取发送者昵称"""
+        sender = getattr(getattr(event, "message_obj", None), "sender", None)
+        if sender:
+            name = getattr(sender, "nickname", None) or getattr(sender, "name", None)
+            if name:
+                return name
+        return str(event.get_sender_id())
+
+    # ── 初始化 ────────────────────────────────────────────────
 
     def _setup_paths(self):
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -202,137 +221,381 @@ class FinCenterPlugin(Star):
 
         return None
 
-    # ---- 从消息中提取路由参数 ----
-    def _route_info(self, event: AstrMessageEvent):
-        group_id = event.get_group_id() or "default"
-        user_id = event.get_sender_id()
-        user_name = event.get_sender_name() or user_id
-        if not self._check_group_allowed(group_id):
-            return None
-        group_id = self._resolve_group_id(group_id)
-        return group_id, user_id, user_name
+    # ── 命令注册 ──────────────────────────────────────────────
 
-    def _args(self, event: AstrMessageEvent, sub: str) -> list:
-        """重建 handlers 期望的完整 args 格式 ["/fc", sub, ...]"""
-        parts = event.message_str.split()
-        if parts[0] == "/fc":
-            return parts  # 完整消息，直接返回
-        # command_group 可能剥除了前缀，手动补回
-        return ["/fc", sub] + parts
-
-    # ---- /fc 指令组 ----
+    # 第一级：/fc 命令组
     @filter.command_group("fc")
-    def fc_group(self):
-        pass
-
-    @fc_group.command("help")
-    async def fc_help(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        img_buf = await plotter.render_help_image(
-            title=f"💰 {self.config.currency.currency_name} 金融中心",
-            sections=[{'commands': [
-                {'cmd': 'fc open', 'desc': '开户'},
-                {'cmd': 'fc me', 'desc': '我的账户'},
-                {'cmd': 'fc sign', 'desc': '每日签到'},
-                {'cmd': 'fc transfer <@> <金额>', 'desc': '转账'},
-                {'cmd': 'fc rank [条数]', 'desc': '财富排行榜'},
-                {'cmd': 'fc stock', 'desc': '股市帮助'},
-                {'cmd': 'fc goods', 'desc': '物资帮助'},
-                {'cmd': 'fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
-            ]}],
-            tips=['输入 fc <子命令> 查看详细帮助，如 fc stock'],
+    async def fc_group(self, event: AstrMessageEvent):
+        """财富中心"""
+        yield event.plain_result(
+            "💰 财富中心指令\n"
+            "━━━━━━━━━━━━━━\n"
+            "  /fc open          开户\n"
+            "  /fc me            我的账户\n"
+            "  /fc sign          每日签到\n"
+            "  /fc transfer      转账\n"
+            "  /fc rank          财富排行榜\n"
+            "  /fc stock         股市指令\n"
+            "  /fc goods         物资指令\n"
+            "  /fc admin         管理员指令"
         )
-        if img_buf:
-            fd, path = tempfile.mkstemp(suffix=".png")
-            with os.fdopen(fd, 'wb') as f:
-                f.write(img_buf.getvalue())
-            yield event.image_result(path)
-        else:
-            yield event.plain_result(self._get_help_text())
+
+    # ── 一、账户指令 ──────────────────────────────────────────
 
     @fc_group.command("open")
-    async def fc_open(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
-        async for result in self.account_handler.handle_open(event, self._args(event, "open"), group_id, user_id, user_name):
+    async def fc_open(self, event: AstrMessageEvent, args: str = ""):
+        """开户。为自己或他人创建金融中心账户。
+
+        用法:
+        - /fc open
+        - /fc open @用户
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "open"] + (args.split() if args else [])
+        async for result in self.account_handler.handle_open(event, arg_list, group_id, user_id, user_name):
             yield result
 
     @fc_group.command("me")
     async def fc_me(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
+        """查看我的账户信息。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
         async for result in self.account_handler.handle_me(event, group_id, user_id, user_name):
             yield result
 
     @fc_group.command("sign")
     async def fc_sign(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
+        """每日签到。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
         async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name):
             yield result
 
     @fc_group.command("transfer")
-    async def fc_transfer(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
-        async for result in self.account_handler.handle_transfer(event, self._args(event, "transfer"), group_id, user_id, user_name):
+    async def fc_transfer(self, event: AstrMessageEvent, args: str = ""):
+        """转账。
+
+        用法:
+        - /fc transfer @用户 金额
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "transfer"] + (args.split() if args else [])
+        async for result in self.account_handler.handle_transfer(event, arg_list, group_id, user_id, user_name):
             yield result
 
     @fc_group.command("rank")
-    async def fc_rank(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
-        async for result in self.admin_handler.handle_rank(event, self._args(event, "rank"), group_id, user_id, user_name):
+    async def fc_rank(self, event: AstrMessageEvent, args: str = ""):
+        """财富排行榜。
+
+        用法:
+        - /fc rank [条数]
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "rank"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle_rank(event, arg_list, group_id, user_id, user_name):
             yield result
 
-    @fc_group.command("stock")
-    async def fc_stock(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
-        async for result in self.stock_handler.handle(event, self._args(event, "stock"), group_id, user_id, user_name):
+    # ── 二、股市指令 /fc stock ────────────────────────────────
+
+    @fc_group.command_group("stock")
+    async def stock_group(self, event: AstrMessageEvent):
+        """股市"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.stock_handler.handle(event, ["fc", "stock"], group_id, user_id, user_name):
             yield result
 
-    @fc_group.command("goods")
-    async def fc_goods(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
-        async for result in self.goods_handler.handle(event, self._args(event, "goods"), group_id, user_id, user_name):
+    @stock_group.command("market")
+    async def stock_market(self, event: AstrMessageEvent):
+        """股市总览（图片）。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.stock_handler.handle(event, ["fc", "stock", "market"], group_id, user_id, user_name):
             yield result
 
-    @fc_group.command("admin")
-    async def fc_admin(self, event: AstrMessageEvent):
-        info = self._route_info(event)
-        if not info: return
-        group_id, user_id, user_name = info
-        async for result in self.admin_handler.handle(event, self._args(event, "admin"), group_id, user_id, user_name):
+    @stock_group.command("buy")
+    async def stock_buy(self, event: AstrMessageEvent, args: str = ""):
+        """买入股票。
+
+        用法:
+        - /fc stock buy <代码> <数量>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "stock", "buy"] + (args.split() if args else [])
+        async for result in self.stock_handler.handle(event, arg_list, group_id, user_id, user_name):
             yield result
 
-    def _get_help_text(self):
-        currency_name = self.config.currency.currency_name
-        lines = [
-            f"💰 {currency_name}金融中心",
-            "━━━━━━━━━━━━━━",
-            "  /fc open              开户",
-            "  /fc me                我的账户",
-            "  /fc sign              每日签到",
-            "  /fc transfer <@用户> <金额>  转账",
-            "  /fc rank [条数]       财富排行榜",
-            "",
-            "  /fc stock             股市帮助",
-            "  /fc goods             物资帮助",
-            "  /fc admin             管理员指令",
-            "",
-            "  /fc help              显示帮助",
-        ]
-        return "\n".join(lines)
+    @stock_group.command("sell")
+    async def stock_sell(self, event: AstrMessageEvent, args: str = ""):
+        """卖出股票。
+
+        用法:
+        - /fc stock sell <代码> <数量>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "stock", "sell"] + (args.split() if args else [])
+        async for result in self.stock_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @stock_group.command("assets")
+    async def stock_assets(self, event: AstrMessageEvent):
+        """查看我的股票持仓。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.stock_handler.handle(event, ["fc", "stock", "assets"], group_id, user_id, user_name):
+            yield result
+
+    @stock_group.command("kline")
+    async def stock_kline(self, event: AstrMessageEvent, args: str = ""):
+        """查看K线图（图片）。
+
+        用法:
+        - /fc stock kline <代码> [条数]
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "stock", "kline"] + (args.split() if args else [])
+        async for result in self.stock_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @stock_group.command("news")
+    async def stock_news(self, event: AstrMessageEvent):
+        """查看今日市场新闻。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.stock_handler.handle(event, ["fc", "stock", "news"], group_id, user_id, user_name):
+            yield result
+
+    @stock_group.command("event")
+    async def stock_event(self, event: AstrMessageEvent, args: str = ""):
+        """手动触发市场新闻事件（管理员专用）。
+
+        用法:
+        - /fc stock event [代码]
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "stock", "event"] + (args.split() if args else [])
+        async for result in self.stock_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    # ── 三、物资指令 /fc goods ────────────────────────────────
+
+    @fc_group.command_group("goods")
+    async def goods_group(self, event: AstrMessageEvent):
+        """物资市场"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.goods_handler.handle(event, ["fc", "goods"], group_id, user_id, user_name):
+            yield result
+
+    @goods_group.command("market")
+    async def goods_market(self, event: AstrMessageEvent):
+        """物资市场总览（图片）。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.goods_handler.handle(event, ["fc", "goods", "market"], group_id, user_id, user_name):
+            yield result
+
+    @goods_group.command("buy")
+    async def goods_buy(self, event: AstrMessageEvent, args: str = ""):
+        """买入物资。
+
+        用法:
+        - /fc goods buy <物资ID> <数量>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "goods", "buy"] + (args.split() if args else [])
+        async for result in self.goods_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @goods_group.command("sell")
+    async def goods_sell(self, event: AstrMessageEvent, args: str = ""):
+        """卖出物资。
+
+        用法:
+        - /fc goods sell <物资ID> <数量>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "goods", "sell"] + (args.split() if args else [])
+        async for result in self.goods_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @goods_group.command("backpack")
+    async def goods_backpack(self, event: AstrMessageEvent):
+        """查看我的物资背包。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.goods_handler.handle(event, ["fc", "goods", "backpack"], group_id, user_id, user_name):
+            yield result
+
+    # ── 四、管理员指令 /fc admin ──────────────────────────────
+
+    @fc_group.command_group("admin")
+    async def admin_group(self, event: AstrMessageEvent):
+        """管理员"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.admin_handler.handle(event, ["fc", "admin"], group_id, user_id, user_name):
+            yield result
+
+    @admin_group.command("balance")
+    async def admin_balance(self, event: AstrMessageEvent, args: str = ""):
+        """为用户增减余额。
+
+        用法:
+        - /fc admin balance <@用户> <金额>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "admin", "balance"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @admin_group.command("setbalance")
+    async def admin_setbalance(self, event: AstrMessageEvent, args: str = ""):
+        """直接设置用户余额。
+
+        用法:
+        - /fc admin setbalance <@用户> <金额>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "admin", "setbalance"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @admin_group.command_group("stock")
+    def admin_stock_group(self):
+        """股市控制"""
+        pass
+
+    @admin_stock_group.command("open")
+    async def admin_stock_open(self, event: AstrMessageEvent):
+        """强制开市。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.admin_handler.handle(event, ["fc", "admin", "stock", "open"], group_id, user_id, user_name):
+            yield result
+
+    @admin_stock_group.command("close")
+    async def admin_stock_close(self, event: AstrMessageEvent):
+        """强制休市。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.admin_handler.handle(event, ["fc", "admin", "stock", "close"], group_id, user_id, user_name):
+            yield result
+
+    @admin_stock_group.command("auto")
+    async def admin_stock_auto(self, event: AstrMessageEvent):
+        """恢复股市自动交易模式。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.admin_handler.handle(event, ["fc", "admin", "stock", "auto"], group_id, user_id, user_name):
+            yield result
+
+    @admin_group.command_group("goods")
+    def admin_goods_group(self):
+        """物资管理"""
+        pass
+
+    @admin_goods_group.command("add")
+    async def admin_goods_add(self, event: AstrMessageEvent, args: str = ""):
+        """添加新物资。
+
+        用法:
+        - /fc admin goods add <物资ID> <名称> <基准价> [图标] [最低价] [最高价] [波动率]
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "admin", "goods", "add"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @admin_goods_group.command("remove")
+    async def admin_goods_remove(self, event: AstrMessageEvent, args: str = ""):
+        """移除物资。
+
+        用法:
+        - /fc admin goods remove <物资ID>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "admin", "goods", "remove"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @admin_goods_group.command("setprice")
+    async def admin_goods_setprice(self, event: AstrMessageEvent, args: str = ""):
+        """手动设置物资当前价格。
+
+        用法:
+        - /fc admin goods setprice <物资ID> <价格>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "admin", "goods", "setprice"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @admin_goods_group.command("setvolatility")
+    async def admin_goods_setvolatility(self, event: AstrMessageEvent, args: str = ""):
+        """设置物资价格波动率。
+
+        用法:
+        - /fc admin goods setvolatility <物资ID> <波动率>
+        """
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        arg_list = ["fc", "admin", "goods", "setvolatility"] + (args.split() if args else [])
+        async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
+            yield result
+
+    @admin_goods_group.command("reset")
+    async def admin_goods_reset(self, event: AstrMessageEvent):
+        """重置所有物资价格至基准价。"""
+        group_id = self._extract_group_id(event)
+        user_id = str(event.get_sender_id())
+        user_name = self._get_user_name(event)
+        async for result in self.admin_handler.handle(event, ["fc", "admin", "goods", "reset"], group_id, user_id, user_name):
+            yield result
+
+    # ── 生命周期 ──────────────────────────────────────────────
 
     async def terminate(self):
         """优雅关闭所有市场引擎"""

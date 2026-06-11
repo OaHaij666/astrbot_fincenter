@@ -266,10 +266,6 @@ class AdminHandler:
                     "格式: /fc admin goods <add|remove|setprice|setvolatility|reset> ..."
                 )
 
-        elif sub == "rank":
-            async for result in self.handle_rank(event, args, group_id, user_id, user_name):
-                yield result
-
         else:
             yield event.plain_result("未知管理指令")
 
