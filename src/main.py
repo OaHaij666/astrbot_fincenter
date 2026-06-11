@@ -222,7 +222,7 @@ class FinCenterPlugin(Star):
 
     # ---- /fc 指令组 ----
     @filter.command_group("fc")
-    def fc_group(self, event: AstrMessageEvent, args: list):
+    def fc_group(self):
         pass
 
     @fc_group.command("help")
