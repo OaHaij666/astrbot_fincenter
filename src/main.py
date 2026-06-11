@@ -305,14 +305,10 @@ class FinCenterPlugin(Star):
 
     # ── 二、股市指令 /fc stock ────────────────────────────────
 
-    @fc_group.command_group("stock")
-    async def stock_group(self, event: AstrMessageEvent):
+    @fc_group.group("stock")
+    def stock_group(self):
         """股市"""
-        group_id = self._extract_group_id(event)
-        user_id = str(event.get_sender_id())
-        user_name = self._get_user_name(event)
-        async for result in self.stock_handler.handle(event, ["fc", "stock"], group_id, user_id, user_name):
-            yield result
+        pass
 
     @stock_group.command("market")
     async def stock_market(self, event: AstrMessageEvent):
@@ -399,14 +395,10 @@ class FinCenterPlugin(Star):
 
     # ── 三、物资指令 /fc goods ────────────────────────────────
 
-    @fc_group.command_group("goods")
-    async def goods_group(self, event: AstrMessageEvent):
+    @fc_group.group("goods")
+    def goods_group(self):
         """物资市场"""
-        group_id = self._extract_group_id(event)
-        user_id = str(event.get_sender_id())
-        user_name = self._get_user_name(event)
-        async for result in self.goods_handler.handle(event, ["fc", "goods"], group_id, user_id, user_name):
-            yield result
+        pass
 
     @goods_group.command("market")
     async def goods_market(self, event: AstrMessageEvent):
@@ -456,14 +448,10 @@ class FinCenterPlugin(Star):
 
     # ── 四、管理员指令 /fc admin ──────────────────────────────
 
-    @fc_group.command_group("admin")
-    async def admin_group(self, event: AstrMessageEvent):
+    @fc_group.group("admin")
+    def admin_group(self):
         """管理员"""
-        group_id = self._extract_group_id(event)
-        user_id = str(event.get_sender_id())
-        user_name = self._get_user_name(event)
-        async for result in self.admin_handler.handle(event, ["fc", "admin"], group_id, user_id, user_name):
-            yield result
+        pass
 
     @admin_group.command("balance")
     async def admin_balance(self, event: AstrMessageEvent, args: str = ""):
@@ -493,7 +481,7 @@ class FinCenterPlugin(Star):
         async for result in self.admin_handler.handle(event, arg_list, group_id, user_id, user_name):
             yield result
 
-    @admin_group.command_group("stock")
+    @admin_group.group("stock")
     def admin_stock_group(self):
         """股市控制"""
         pass
@@ -525,7 +513,7 @@ class FinCenterPlugin(Star):
         async for result in self.admin_handler.handle(event, ["fc", "admin", "stock", "auto"], group_id, user_id, user_name):
             yield result
 
-    @admin_group.command_group("goods")
+    @admin_group.group("goods")
     def admin_goods_group(self):
         """物资管理"""
         pass
