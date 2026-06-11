@@ -114,7 +114,6 @@ class StockConfig:
         return cls(
             stock_enabled=bool(data.get("stock_enabled", True)),
             stock_companies=list(data.get("stock_companies", [])),
-            stock_companies=list(data.get("stock_companies", [])),
             stock_volatility=float(data.get("stock_volatility", 0.02)),
             stock_update_interval=int(data.get("stock_update_interval", 300)),
             stock_fee_rate=float(data.get("stock_fee_rate", 0.001)),
