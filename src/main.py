@@ -9,7 +9,9 @@ import tempfile
 import logging
 from typing import Any
 
-from astrbot.api import register, AstrBotEvent
+from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.star import Context, Star
+from astrbot.api import logger
 
 from .config import FinCenterConfig
 from .core.database import DB, ChatRewardState, UserAccount, PaidCommand, get_china_time
@@ -19,15 +21,11 @@ from .handlers import AccountHandler, StockHandler, GoodsHandler, AdminHandler
 from .utils import plotter
 from migrations.migrate import migrate, set_paths as set_migrate_paths
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
-
-@register("FinCenter")
-class FinCenterPlugin:
-    def __init__(self, ctx: Any):
-        self.ctx = ctx
-        self._raw_config = ctx.config
+class FinCenterPlugin(Star):
+    def __init__(self, context: Context, config: dict = None):
+        super().__init__(context)
+        self._raw_config = config or {}
 
         self._setup_paths()
         self._setup_config()
@@ -40,16 +38,14 @@ class FinCenterPlugin:
         self.data_dir = os.path.join(self.base_dir, 'data')
         self.assets_dir = os.path.join(self.base_dir, 'assets')
         self.cache_dir = os.path.join(self.data_dir, 'cache')
-        self.fonts_dir = os.path.join(self.assets_dir, 'fonts')
 
-        for d in [self.data_dir, self.assets_dir, self.cache_dir, self.fonts_dir]:
+        for d in [self.data_dir, self.assets_dir, self.cache_dir]:
             os.makedirs(d, exist_ok=True)
 
         plotter.set_paths(base_dir=self.base_dir)
         set_migrate_paths(base_dir=self.base_dir)
 
     def _setup_config(self):
-        """使用 FinCenterConfig 解析配置，替代散落的 get() 调用"""
         self.config = FinCenterConfig.from_dict(self._raw_config)
 
     def _setup_database(self):
@@ -85,13 +81,11 @@ class FinCenterPlugin:
             logger.info("Goods market started")
 
     def _resolve_group_id(self, group_id: str) -> str:
-        """根据 cross_group_data 配置决定 group_id：跨群共享时统一为 __global__"""
         if self.config.basic.cross_group_data:
             return "__global__"
         return group_id
 
     def _check_group_allowed(self, group_id: str) -> bool:
-        """检查群是否在允许范围内"""
         cfg = self.config.basic
         if not cfg.group_filter_enabled:
             return True
@@ -102,7 +96,6 @@ class FinCenterPlugin:
         return True
 
     def _process_chat_reward(self, group_id: str, user_id: str, user_name: str):
-        """处理发言奖励（同步，在 on_event 中调用）"""
         cfg = self.config.chat_reward
         if not cfg.chat_reward_enabled:
             return
@@ -150,7 +143,6 @@ class FinCenterPlugin:
             state.daily_count += 1
 
     def _check_paid_command(self, message: str, group_id: str, user_id: str) -> str | None:
-        """检查是否为收费指令，返回扣费提示消息；非收费指令返回 None"""
         cfg = self.config.paid_cmd
         if not cfg.paid_cmd_enabled:
             return None
@@ -209,9 +201,10 @@ class FinCenterPlugin:
 
         return None
 
-    async def on_event(self, event: AstrBotEvent):
-        message = event.message_obj.message
-        if not message or not isinstance(message, str):
+    @filter.on_message_event()
+    async def on_event(self, event: AstrMessageEvent):
+        message = event.message_str
+        if not message:
             return
 
         message = message.strip()
@@ -220,11 +213,9 @@ class FinCenterPlugin:
         user_id = event.get_sender_id()
         user_name = event.get_sender_name() or user_id
 
-        # 群过滤检查
         if not self._check_group_allowed(group_id):
             return
 
-        # 跨群数据
         group_id = self._resolve_group_id(group_id)
 
         # 非 /fc 指令：处理发言奖励和收费指令
@@ -237,7 +228,7 @@ class FinCenterPlugin:
 
         args = message.split()
         if len(args) < 2:
-            yield event.plain_result(self._get_help())
+            yield event.plain_result(self._get_help_text())
             return
 
         sub = args[1] if len(args) >= 2 else None
@@ -257,7 +248,7 @@ class FinCenterPlugin:
                         {'cmd': '/fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
                     ],
                 }],
-                tips=[f'输入 /fc <子命令> 查看详细帮助，如 /fc stock'],
+                tips=['输入 /fc <子命令> 查看详细帮助，如 /fc stock'],
             )
             if img_buf:
                 fd, path = tempfile.mkstemp(suffix=".png")
@@ -305,7 +296,6 @@ class FinCenterPlugin:
 
     def _get_help_text(self):
         currency_name = self.config.currency.currency_name
-        currency_icon = self.config.currency.currency_icon
         lines = [
             f"💰 {currency_name}金融中心",
             "━━━━━━━━━━━━━━",
@@ -323,7 +313,7 @@ class FinCenterPlugin:
         ]
         return "\n".join(lines)
 
-    def shutdown(self):
+    async def terminate(self):
         """优雅关闭所有市场引擎"""
         if self.stock_market:
             self.stock_market.stop()
@@ -331,15 +321,10 @@ class FinCenterPlugin:
         if self.goods_market:
             self.goods_market.stop()
             logger.info("Goods market stopped")
-        # 关闭 Playwright 浏览器
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(plotter.shutdown())
-            else:
-                loop.run_until_complete(plotter.shutdown())
-        except Exception:
-            pass
+        await plotter.shutdown()
 
     def __del__(self):
-        self.shutdown()
+        if self.stock_market:
+            self.stock_market.stop()
+        if self.goods_market:
+            self.goods_market.stop()
