@@ -225,20 +225,9 @@ class FinCenterPlugin(Star):
 
     # 第一级：/fc 命令组
     @filter.command_group("fc")
-    async def fc_group(self, event: AstrMessageEvent):
+    def fc_group(self):
         """财富中心"""
-        yield event.plain_result(
-            "💰 财富中心指令\n"
-            "━━━━━━━━━━━━━━\n"
-            "  /fc open          开户\n"
-            "  /fc me            我的账户\n"
-            "  /fc sign          每日签到\n"
-            "  /fc transfer      转账\n"
-            "  /fc rank          财富排行榜\n"
-            "  /fc stock         股市指令\n"
-            "  /fc goods         物资指令\n"
-            "  /fc admin         管理员指令"
-        )
+        pass
 
     # ── 一、账户指令 ──────────────────────────────────────────
 
