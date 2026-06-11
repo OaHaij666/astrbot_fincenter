@@ -212,7 +212,7 @@ class FinCenterPlugin(Star):
         group_id = self._resolve_group_id(group_id)
         return group_id, user_id, user_name
 
-    def _mkargs(self, event: AstrMessageEvent, sub: str) -> list:
+    def _args(self, event: AstrMessageEvent, sub: str) -> list:
         """重建 handlers 期望的完整 args 格式 ["/fc", sub, ...]"""
         parts = event.message_str.split()
         if parts[0] == "/fc":
@@ -232,88 +232,84 @@ class FinCenterPlugin(Star):
         img_buf = await plotter.render_help_image(
             title=f"💰 {self.config.currency.currency_name} 金融中心",
             sections=[{'commands': [
-                {'cmd': '/fc open', 'desc': '开户'},
-                {'cmd': '/fc me', 'desc': '我的账户'},
-                {'cmd': '/fc sign', 'desc': '每日签到'},
-                {'cmd': '/fc transfer <@> <金额>', 'desc': '转账'},
-                {'cmd': '/fc rank [条数]', 'desc': '财富排行榜'},
-                {'cmd': '/fc stock', 'desc': '股市帮助'},
-                {'cmd': '/fc goods', 'desc': '物资帮助'},
-                {'cmd': '/fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
+                {'cmd': 'fc open', 'desc': '开户'},
+                {'cmd': 'fc me', 'desc': '我的账户'},
+                {'cmd': 'fc sign', 'desc': '每日签到'},
+                {'cmd': 'fc transfer <@> <金额>', 'desc': '转账'},
+                {'cmd': 'fc rank [条数]', 'desc': '财富排行榜'},
+                {'cmd': 'fc stock', 'desc': '股市帮助'},
+                {'cmd': 'fc goods', 'desc': '物资帮助'},
+                {'cmd': 'fc admin', 'desc': '管理员指令（限管理员）', 'admin': True},
             ]}],
-            tips=['输入 /fc <子命令> 查看详细帮助，如 /fc stock'],
+            tips=['输入 fc <子命令> 查看详细帮助，如 fc stock'],
         )
         if img_buf:
             fd, path = tempfile.mkstemp(suffix=".png")
             with os.fdopen(fd, 'wb') as f:
                 f.write(img_buf.getvalue())
-            yield event.image_result(path)
-        else:
-            yield event.plain_result(self._get_help_text())
+            return event.image_result(path)
+        return event.plain_result(self._get_help_text())
+
+    async def _delegate(self, event, handler_method, *args):
+        """调用 handler 的异步生成器，通过 event.send() 逐个发送结果"""
+        async for result in handler_method(*args):
+            await event.send(result)
 
     @fc.command("open")
     async def fc_open(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.account_handler.handle_open(event, _args(event, "open"), group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.account_handler.handle_open, event, self._args(event, "open"), group_id, user_id, user_name)
 
     @fc.command("me")
     async def fc_me(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.account_handler.handle_me(event, group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.account_handler.handle_me, event, group_id, user_id, user_name)
 
     @fc.command("sign")
     async def fc_sign(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.account_handler.handle_sign, event, group_id, user_id, user_name)
 
     @fc.command("transfer")
     async def fc_transfer(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.account_handler.handle_transfer(event, _args(event, "transfer"), group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.account_handler.handle_transfer, event, self._args(event, "transfer"), group_id, user_id, user_name)
 
     @fc.command("rank")
     async def fc_rank(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.admin_handler.handle_rank(event, _args(event, "rank"), group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.admin_handler.handle_rank, event, self._args(event, "rank"), group_id, user_id, user_name)
 
     @fc.command("stock")
     async def fc_stock(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.stock_handler.handle(event, _args(event, "stock"), group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.stock_handler.handle, event, self._args(event, "stock"), group_id, user_id, user_name)
 
     @fc.command("goods")
     async def fc_goods(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.goods_handler.handle(event, _args(event, "goods"), group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.goods_handler.handle, event, self._args(event, "goods"), group_id, user_id, user_name)
 
     @fc.command("admin")
     async def fc_admin(self, event: AstrMessageEvent):
         info = self._route_info(event)
         if not info: return
         group_id, user_id, user_name = info
-        async for result in self.admin_handler.handle(event, _args(event, "admin"), group_id, user_id, user_name):
-            yield result
+        await self._delegate(event, self.admin_handler.handle, event, self._args(event, "admin"), group_id, user_id, user_name)
 
     def _get_help_text(self):
         currency_name = self.config.currency.currency_name
