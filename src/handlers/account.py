@@ -58,8 +58,8 @@ class AccountHandler:
                 payer.balance -= self.plugin.config.currency.open_account_cost
 
                 self.plugin.db.get_or_create_user(
-                    group_id, str(target_id), str(target_id),
-                    self.plugin.config.currency.initial_balance, session=session
+                    session, group_id, str(target_id), str(target_id),
+                    self.plugin.config.currency.initial_balance
                 )
 
             yield event.plain_result(
@@ -80,8 +80,8 @@ class AccountHandler:
                 return
 
             self.plugin.db.get_or_create_user(
-                group_id, user_id, user_name,
-                self.plugin.config.currency.initial_balance, session=session
+                session, group_id, user_id, user_name,
+                self.plugin.config.currency.initial_balance
             )
 
         yield event.plain_result(
@@ -91,10 +91,12 @@ class AccountHandler:
 
     async def handle_me(self, event, group_id, user_id, user_name):
         with self.plugin.db.session_scope() as session:
-            user = self.plugin.db.get_or_create_user(
-                group_id, user_id, user_name,
-                self.plugin.config.currency.initial_balance, session=session
-            )
+            user = session.query(UserAccount).filter_by(
+                group_id=group_id, user_id=user_id
+            ).first()
+            if not user:
+                yield event.plain_result("你还没有账户，请先使用 /fc open 开户")
+                return
             user.last_active = get_china_time()
 
             balance = user.balance
