@@ -85,9 +85,9 @@ class FinCenterPlugin(Star):
 
     def _setup_handlers(self):
         self.account_handler = AccountHandler(self)
-        self.stock_handler = StockHandler(self)
-        self.goods_handler = GoodsHandler(self)
-        self.admin_handler = AdminHandler(self)
+        self.stock_handler = StockHandler(self, self.html_render)
+        self.goods_handler = GoodsHandler(self, self.html_render)
+        self.admin_handler = AdminHandler(self, self.html_render)
 
     def _setup_markets(self):
         self.stock_market = None
@@ -535,7 +535,6 @@ class FinCenterPlugin(Star):
         if self.goods_market:
             self.goods_market.stop()
             logger.info("Goods market stopped")
-        await plotter.shutdown()
 
     def __del__(self):
         if self.stock_market:

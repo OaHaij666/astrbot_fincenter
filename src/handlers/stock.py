@@ -2,16 +2,37 @@
 
 处理股市查看、买卖、K线图、新闻等指令。
 ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给绘图和展示层。
+图片渲染使用 AstrBot 框架内置的 html_render，通过 event.image_result() 发送。
 """
 import asyncio
 
 from ..core.database import StockHistory, get_china_time
-from ..utils import plotter, save_temp_image, cleanup_temp_image
+from ..utils import plotter
 
 
 class StockHandler:
-    def __init__(self, plugin):
+    def __init__(self, plugin, html_render):
         self.plugin = plugin
+        self.html_render = html_render
+
+    async def _render_image(self, html_content, data=None, options=None):
+        """调用框架 html_render 渲染 HTML 为图片 URL
+
+        Args:
+            html_content: HTML 字符串
+            data: Jinja2 数据字典（数据已内嵌在 HTML 中时传空 dict）
+            options: 渲染选项
+
+        Returns:
+            图片 URL 字符串，失败返回 None
+        """
+        try:
+            url = await self.html_render(html_content, data or {}, options=options or {})
+            return url
+        except Exception as e:
+            from astrbot.api import logger
+            logger.error(f"html_render failed: {e}")
+            return None
 
     async def _build_market_image(self, group_id, user_id):
         if not self.plugin.stock_market:
@@ -52,37 +73,17 @@ class StockHandler:
                 'time': n['timestamp'].strftime("%H:%M") if n.get('timestamp') else "",
             })
 
-        kline_images = {}
-        fetch_limit = self.plugin.config.stock.stock_kline_candles + 40
-        with self.plugin.db.session_scope() as session:
-            for code in codes:
-                history = session.query(StockHistory).filter_by(
-                    group_id=group_id, code=code
-                ).order_by(StockHistory.timestamp.desc()).limit(fetch_limit).all()
-                if history:
-                    history_dicts = [h.to_kline_dict() for h in reversed(history)]
-                    tech_levels = self.plugin.stock_market.get_tech_levels(code)
-                    kline_buf = await plotter.plot_kline(
-                        history_dicts, title=f"{code} K线走势",
-                        tech_levels=tech_levels,
-                        max_candles=self.plugin.config.stock.stock_kline_candles,
-                        font_key=self.plugin.config.stock.stock_font,
-                    )
-                    if kline_buf:
-                        kline_images[code] = kline_buf
-
-        img_buf = await plotter.render_stock_market_image(
+        result = plotter.render_stock_market_html(
             market_data, holdings_data, news_data,
             self.plugin.config.currency.currency_name,
             self.plugin.config.currency.currency_icon,
-            kline_images,
         )
-        for img_b in kline_images.values():
-            try:
-                img_b.close()
-            except Exception:
-                pass
-        return img_buf
+        if not result:
+            return None
+
+        html_content, data = result
+        url = await self._render_image(html_content, data)
+        return url
 
     async def _build_kline_image(self, code, limit, group_id):
         with self.plugin.db.session_scope() as session:
@@ -95,11 +96,18 @@ class StockHandler:
             return None
 
         tech_levels = self.plugin.stock_market.get_tech_levels(code)
-        return await plotter.plot_kline(
+        result = plotter.render_kline_html(
             history_dicts, title=f"{code} K线走势",
             tech_levels=tech_levels,
+            max_candles=self.plugin.config.stock.stock_kline_candles,
             font_key=self.plugin.config.stock.stock_font,
         )
+        if not result:
+            return None
+
+        html_content, data = result
+        url = await self._render_image(html_content, data)
+        return url
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if not self.plugin.stock_market:
@@ -109,7 +117,7 @@ class StockHandler:
         sub = args[2] if len(args) >= 3 else None
 
         if sub is None:
-            img_buf = await plotter.render_help_image(
+            result = plotter.render_help_html(
                 title="📈 股市指令",
                 sections=[{
                     'commands': [
@@ -124,10 +132,11 @@ class StockHandler:
                 }],
                 tips=[f'代码列表请先查看 /fc stock market，买入前建议先看K线'],
             )
-            if img_buf:
-                path = save_temp_image(img_buf)
-                if path:
-                    yield event.image_result(path)
+            if result:
+                html_content, data = result
+                url = await self._render_image(html_content, data)
+                if url:
+                    yield event.image_result(url)
                     return
             yield event.plain_result(self._get_stock_help_text())
             return
@@ -135,13 +144,9 @@ class StockHandler:
         sub = args[2]
 
         if sub == "market":
-            img_buf = await self._build_market_image(group_id, user_id)
-            if img_buf:
-                img_path = save_temp_image(img_buf)
-                if img_path:
-                    yield event.image_result(img_path)
-                else:
-                    yield event.plain_result("图片生成失败")
+            url = await self._build_market_image(group_id, user_id)
+            if url:
+                yield event.image_result(url)
             else:
                 status = self.plugin.stock_market.get_market_status()
                 yield event.plain_result(status)
@@ -204,13 +209,9 @@ class StockHandler:
                 except ValueError:
                     pass
 
-            img_buf = await self._build_kline_image(code, limit, group_id)
-            if img_buf:
-                img_path = save_temp_image(img_buf)
-                if img_path:
-                    yield event.image_result(img_path)
-                else:
-                    yield event.plain_result("绘图保存失败")
+            url = await self._build_kline_image(code, limit, group_id)
+            if url:
+                yield event.image_result(url)
             else:
                 yield event.plain_result("绘图失败")
 

@@ -3,14 +3,26 @@
 处理余额管理、股市控制、物资管理等管理员指令。
 排行榜已移至普通用户指令，此处仅保留管理员入口。
 所有数据库操作通过 session_scope() 上下文管理器进行。
+图片渲染使用 AstrBot 框架内置的 html_render，通过 event.image_result() 发送。
 """
 from ..core.database import UserAccount, GoodsDefinition, GoodsMarketPrice
-from ..utils import plotter, save_temp_image, cleanup_temp_image
+from ..utils import plotter
 
 
 class AdminHandler:
-    def __init__(self, plugin):
+    def __init__(self, plugin, html_render):
         self.plugin = plugin
+        self.html_render = html_render
+
+    async def _render_image(self, html_content, data=None, options=None):
+        """调用框架 html_render 渲染 HTML 为图片 URL"""
+        try:
+            url = await self.html_render(html_content, data or {}, options=options or {})
+            return url
+        except Exception as e:
+            from astrbot.api import logger
+            logger.error(f"html_render failed: {e}")
+            return None
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if str(user_id) not in self.plugin.config.basic.admin_ids:
@@ -20,7 +32,7 @@ class AdminHandler:
         sub = args[2] if len(args) >= 3 else None
 
         if sub is None:
-            img_buf = await plotter.render_help_image(
+            result = plotter.render_help_html(
                 title="⚙️ 管理员指令",
                 sections=[
                     {
@@ -51,10 +63,11 @@ class AdminHandler:
                 ],
                 tips=['上述指令仅限管理员使用，@用户 可直接用 QQ号'],
             )
-            if img_buf:
-                path = save_temp_image(img_buf)
-                if path:
-                    yield event.image_result(path)
+            if result:
+                html_content, data = result
+                url = await self._render_image(html_content, data)
+                if url:
+                    yield event.image_result(url)
                     return
             yield event.plain_result(self._get_admin_help_text())
             return
@@ -292,16 +305,17 @@ class AdminHandler:
 
         rank_data.sort(key=lambda x: x['total_wealth'], reverse=True)
 
-        img_buf = await plotter.render_rank_image(
+        result = plotter.render_rank_html(
             rank_data,
             self.plugin.config.currency.currency_name,
             self.plugin.config.currency.currency_icon,
         )
 
-        if img_buf:
-            path = save_temp_image(img_buf)
-            if path:
-                yield event.image_result(path)
+        if result:
+            html_content, data = result
+            url = await self._render_image(html_content, data)
+            if url:
+                yield event.image_result(url)
             else:
                 yield event.plain_result("排行榜图片生成失败")
         else:

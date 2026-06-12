@@ -1,13 +1,25 @@
 """物资市场处理器
 
 处理物资市场查看、买卖、背包查看等指令。
+图片渲染使用 AstrBot 框架内置的 html_render，通过 event.image_result() 发送。
 """
-from ..utils import plotter, save_temp_image, cleanup_temp_image
+from ..utils import plotter
 
 
 class GoodsHandler:
-    def __init__(self, plugin):
+    def __init__(self, plugin, html_render):
         self.plugin = plugin
+        self.html_render = html_render
+
+    async def _render_image(self, html_content, data=None, options=None):
+        """调用框架 html_render 渲染 HTML 为图片 URL"""
+        try:
+            url = await self.html_render(html_content, data or {}, options=options or {})
+            return url
+        except Exception as e:
+            from astrbot.api import logger
+            logger.error(f"html_render failed: {e}")
+            return None
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if not self.plugin.goods_market:
@@ -17,7 +29,7 @@ class GoodsHandler:
         sub = args[2] if len(args) >= 3 else None
 
         if sub is None:
-            img_buf = await plotter.render_help_image(
+            result = plotter.render_help_html(
                 title="📦 物资指令",
                 sections=[{
                     'commands': [
@@ -29,10 +41,11 @@ class GoodsHandler:
                 }],
                 tips=['物资价格会定期刷新，请注意市场波动'],
             )
-            if img_buf:
-                path = save_temp_image(img_buf)
-                if path:
-                    yield event.image_result(path)
+            if result:
+                html_content, data = result
+                url = await self._render_image(html_content, data)
+                if url:
+                    yield event.image_result(url)
                     return
             yield event.plain_result(self._get_goods_help_text())
             return
@@ -44,15 +57,16 @@ class GoodsHandler:
             backpack = self.plugin.goods_market.get_backpack(group_id, user_id)
             stock_data = {b['goods_id']: b['amount'] for b in backpack}
 
-            img_buf = await plotter.render_goods_market_image(
+            result = plotter.render_goods_market_html(
                 goods_list, stock_data,
                 self.plugin.config.currency.currency_name,
                 self.plugin.config.currency.currency_icon,
             )
-            if img_buf:
-                img_path = save_temp_image(img_buf)
-                if img_path:
-                    yield event.image_result(img_path)
+            if result:
+                html_content, data = result
+                url = await self._render_image(html_content, data)
+                if url:
+                    yield event.image_result(url)
                 else:
                     yield event.plain_result("图片生成失败")
             else:
