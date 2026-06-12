@@ -2,10 +2,12 @@
 
 处理股市查看、买卖、K线图、新闻等指令。
 ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给绘图和展示层。
-图片渲染使用 AstrBot 框架内置的 html_render，通过 event.image_result() 发送。
+图片渲染对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
 """
 import asyncio
+import base64
 
+from astrbot.api import logger
 from ..core.database import StockHistory, get_china_time
 from ..utils import plotter
 
@@ -16,21 +18,31 @@ class StockHandler:
         self.html_render = html_render
 
     async def _render_image(self, html_content, data=None, options=None):
-        """调用框架 html_render 渲染 HTML 为图片 URL
+        """调用框架 html_render 渲染 HTML 为图片，返回可用于 event.image_result() 的 URL
 
-        Args:
-            html_content: HTML 字符串
-            data: Jinja2 数据字典（数据已内嵌在 HTML 中时传空 dict）
-            options: 渲染选项
-
-        Returns:
-            图片 URL 字符串，失败返回 None
+        对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
+        return_url=False 时返回 bytes 或 str(文件路径)
+        bytes → base64:// URL, str → 直接作为 URL
         """
         try:
-            url = await self.html_render(html_content, data or {}, options=options or {})
-            return url
+            image_data = await self.html_render(
+                html_content,
+                data or {},
+                False,  # return_url=False，直接获取图片数据
+                options or {"type": "png"},
+            )
+            if not image_data:
+                return None
+
+            if isinstance(image_data, bytes):
+                b64 = base64.b64encode(image_data).decode("utf-8")
+                return f"base64://{b64}"
+            elif isinstance(image_data, str):
+                return image_data
+            else:
+                logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
+                return None
         except Exception as e:
-            from astrbot.api import logger
             logger.error(f"html_render failed: {e}")
             return None
 

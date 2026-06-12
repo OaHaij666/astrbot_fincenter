@@ -1,8 +1,11 @@
 """物资市场处理器
 
 处理物资市场查看、买卖、背包查看等指令。
-图片渲染使用 AstrBot 框架内置的 html_render，通过 event.image_result() 发送。
+图片渲染对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
 """
+import base64
+
+from astrbot.api import logger
 from ..utils import plotter
 
 
@@ -12,12 +15,31 @@ class GoodsHandler:
         self.html_render = html_render
 
     async def _render_image(self, html_content, data=None, options=None):
-        """调用框架 html_render 渲染 HTML 为图片 URL"""
+        """调用框架 html_render 渲染 HTML 为图片，返回可用于 event.image_result() 的 URL
+
+        对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
+        return_url=False 时返回 bytes 或 str(文件路径)
+        bytes → base64:// URL, str → 直接作为 URL
+        """
         try:
-            url = await self.html_render(html_content, data or {}, options=options or {})
-            return url
+            image_data = await self.html_render(
+                html_content,
+                data or {},
+                False,  # return_url=False，直接获取图片数据
+                options or {"type": "png"},
+            )
+            if not image_data:
+                return None
+
+            if isinstance(image_data, bytes):
+                b64 = base64.b64encode(image_data).decode("utf-8")
+                return f"base64://{b64}"
+            elif isinstance(image_data, str):
+                return image_data
+            else:
+                logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
+                return None
         except Exception as e:
-            from astrbot.api import logger
             logger.error(f"html_render failed: {e}")
             return None
 
