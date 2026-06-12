@@ -85,10 +85,18 @@ class GoodsMarket:
 
     def add_goods(self, group_id, goods_id, name, icon="📦", base_price=10.0,
                   min_price=None, max_price=None, volatility=0.1, preview_image_path=""):
+        if base_price <= 0:
+            return False
         if min_price is None:
             min_price = base_price * 0.1
         if max_price is None:
             max_price = base_price * 10.0
+        if min_price < 0:
+            min_price = 0
+        if max_price <= min_price:
+            max_price = min_price + base_price
+        if volatility < 0:
+            volatility = 0.05
 
         with self.db.session_scope() as session:
             existing = session.query(GoodsDefinition).filter_by(
@@ -164,6 +172,13 @@ class GoodsMarket:
             if not definition:
                 return False
 
+            # 先获取当前价格用于退款计算
+            market = session.query(GoodsMarketPrice).filter_by(
+                group_id=group_id, goods_id=goods_id
+            ).first()
+            refund_price = market.current_price if market else 0
+
+            # 删除市场价格记录
             session.query(GoodsMarketPrice).filter_by(
                 group_id=group_id, goods_id=goods_id
             ).delete()
@@ -172,10 +187,7 @@ class GoodsMarket:
                 group_id=group_id, goods_id=goods_id
             ).all()
             for bp in backpacks:
-                market = session.query(GoodsMarketPrice).filter_by(
-                    group_id=group_id, goods_id=goods_id
-                ).first()
-                refund = bp.amount * (market.current_price if market else 0)
+                refund = bp.amount * refund_price
                 if refund > 0:
                     user = session.query(UserAccount).filter_by(
                         group_id=group_id, user_id=bp.user_id

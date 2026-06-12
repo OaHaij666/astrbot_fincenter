@@ -136,10 +136,12 @@ class AccountHandler:
             return
 
         with self.plugin.db.session_scope() as session:
-            user = self.plugin.db.get_or_create_user(
-                group_id, user_id, user_name,
-                self.plugin.config.currency.initial_balance, session=session
-            )
+            user = session.query(UserAccount).filter_by(
+                group_id=group_id, user_id=user_id
+            ).first()
+            if not user:
+                yield event.plain_result("你还没有账户，请先使用 /fc open 开户")
+                return
             now = get_china_time()
             today = now.strftime('%Y-%m-%d')
 

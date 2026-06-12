@@ -4,25 +4,13 @@
 排行榜已移至普通用户指令，此处仅保留管理员入口。
 所有数据库操作通过 session_scope() 上下文管理器进行。
 """
-import os
-import tempfile
-
 from ..core.database import UserAccount, GoodsDefinition, GoodsMarketPrice
-from ..utils import plotter
+from ..utils import plotter, save_temp_image, cleanup_temp_image
 
 
 class AdminHandler:
     def __init__(self, plugin):
         self.plugin = plugin
-
-    def _save_temp_image(self, buf):
-        try:
-            fd, path = tempfile.mkstemp(suffix=".png")
-            with os.fdopen(fd, 'wb') as f:
-                f.write(buf.getvalue())
-            return path
-        except Exception:
-            return None
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if str(user_id) not in self.plugin.config.basic.admin_ids:
@@ -64,7 +52,7 @@ class AdminHandler:
                 tips=['上述指令仅限管理员使用，@用户 可直接用 QQ号'],
             )
             if img_buf:
-                path = self._save_temp_image(img_buf)
+                path = save_temp_image(img_buf)
                 if path:
                     yield event.image_result(path)
                     return
@@ -138,6 +126,8 @@ class AdminHandler:
                     return
 
                 user.balance = amount
+                if user.balance < 0:
+                    user.balance = 0
 
             yield event.plain_result(f"✅ 已将 {target_id} 的余额设为 {amount:.2f}")
 
@@ -309,7 +299,7 @@ class AdminHandler:
         )
 
         if img_buf:
-            path = self._save_temp_image(img_buf)
+            path = save_temp_image(img_buf)
             if path:
                 yield event.image_result(path)
             else:

@@ -2,24 +2,12 @@
 
 处理物资市场查看、买卖、背包查看等指令。
 """
-import os
-import tempfile
-
-from ..utils import plotter
+from ..utils import plotter, save_temp_image, cleanup_temp_image
 
 
 class GoodsHandler:
     def __init__(self, plugin):
         self.plugin = plugin
-
-    def _save_temp_image(self, buf):
-        try:
-            fd, path = tempfile.mkstemp(suffix=".png")
-            with os.fdopen(fd, 'wb') as f:
-                f.write(buf.getvalue())
-            return path
-        except Exception:
-            return None
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if not self.plugin.goods_market:
@@ -42,7 +30,7 @@ class GoodsHandler:
                 tips=['物资价格会定期刷新，请注意市场波动'],
             )
             if img_buf:
-                path = self._save_temp_image(img_buf)
+                path = save_temp_image(img_buf)
                 if path:
                     yield event.image_result(path)
                     return
@@ -62,7 +50,7 @@ class GoodsHandler:
                 self.plugin.config.currency.currency_icon,
             )
             if img_buf:
-                img_path = self._save_temp_image(img_buf)
+                img_path = save_temp_image(img_buf)
                 if img_path:
                     yield event.image_result(img_path)
                 else:

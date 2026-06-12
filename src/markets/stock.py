@@ -193,6 +193,7 @@ class StockMarket:
                 volume=vol,
             )
             session.add(history)
+            price = close
         self.prices[code] = price
         self.current_candles[code]["open"] = price
         self.current_candles[code]["high"] = price
@@ -605,8 +606,9 @@ class StockMarket:
         )
 
         if news_result["trend_shift"] != 0:
-            new_trend = self.trend_levels.get(code, 0) + news_result["trend_shift"]
-            self.trend_levels[code] = max(-3, min(3, new_trend))
+            with self.lock:
+                new_trend = self.trend_levels.get(code, 0) + news_result["trend_shift"]
+                self.trend_levels[code] = max(-3, min(3, new_trend))
 
         if news_result["immediate_jump"] != 0:
             with self.lock:

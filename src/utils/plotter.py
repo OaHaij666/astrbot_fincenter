@@ -12,7 +12,7 @@ import logging
 import asyncio
 from typing import Optional
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def set_paths(base_dir: str = None, assets_dir: str = None, data_dir: str = None
     _echarts_path = os.path.join(_assets_dir, 'js', 'echarts.min.js')
     _jinja_env = Environment(
         loader=FileSystemLoader(_templates_dir),
-        autoescape=False,
+        autoescape=select_autoescape(['html', 'xml']),
     )
 
 
@@ -64,7 +64,7 @@ def _get_jinja():
     if _jinja_env is None:
         _jinja_env = Environment(
             loader=FileSystemLoader(_templates_dir),
-            autoescape=False,
+            autoescape=select_autoescape(['html', 'xml']),
         )
     return _jinja_env
 
@@ -181,31 +181,60 @@ async def _get_browser():
     global _browser, _playwright
     if _browser and _browser.is_connected():
         return _browser
-    try:
-        from playwright.async_api import async_playwright
-        _playwright = await async_playwright().start()
-        # 尝试使用系统浏览器（Edge > Chrome），避免下载 Chromium
-        for channel in ['msedge', 'chrome']:
+    if _browser_lock is not None:
+        async with _browser_lock:
+            # Double-check after acquiring lock
+            if _browser and _browser.is_connected():
+                return _browser
             try:
+                from playwright.async_api import async_playwright
+                _playwright = await async_playwright().start()
+                # 尝试使用系统浏览器（Edge > Chrome），避免下载 Chromium
+                for channel in ['msedge', 'chrome']:
+                    try:
+                        _browser = await _playwright.chromium.launch(
+                            headless=True,
+                            channel=channel,
+                            args=['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
+                        )
+                        logger.info(f"Playwright browser launched (channel={channel})")
+                        return _browser
+                    except Exception:
+                        continue
+                # 回退到下载的 Chromium
                 _browser = await _playwright.chromium.launch(
                     headless=True,
-                    channel=channel,
                     args=['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
                 )
-                logger.info(f"Playwright browser launched (channel={channel})")
+                logger.info("Playwright browser launched (chromium)")
                 return _browser
-            except Exception:
-                continue
-        # 回退到下载的 Chromium
-        _browser = await _playwright.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
-        )
-        logger.info("Playwright browser launched (chromium)")
-        return _browser
-    except Exception as e:
-        logger.error(f"Failed to launch Playwright browser: {e}")
-        raise
+            except Exception as e:
+                logger.error(f"Failed to launch Playwright browser: {e}")
+                raise
+    else:
+        try:
+            from playwright.async_api import async_playwright
+            _playwright = await async_playwright().start()
+            for channel in ['msedge', 'chrome']:
+                try:
+                    _browser = await _playwright.chromium.launch(
+                        headless=True,
+                        channel=channel,
+                        args=['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
+                    )
+                    logger.info(f"Playwright browser launched (channel={channel})")
+                    return _browser
+                except Exception:
+                    continue
+            _browser = await _playwright.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-gpu', '--font-render-hinting=none'],
+            )
+            logger.info("Playwright browser launched (chromium)")
+            return _browser
+        except Exception as e:
+            logger.error(f"Failed to launch Playwright browser: {e}")
+            raise
 
 
 async def _screenshot_html(html_content: str, width: int = 800, full_page: bool = True) -> bytes:

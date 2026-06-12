@@ -6,7 +6,7 @@
 """
 import requests
 from contextlib import contextmanager
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, text, Numeric, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timedelta, timezone
 
@@ -50,13 +50,14 @@ class UserAccount(Base):
     group_id = Column(String, nullable=False)
     user_id = Column(String, nullable=False)
     user_name = Column(String, default='')
-    balance = Column(Float, default=0.0)
-    total_earned = Column(Float, default=0.0)
-    total_spent = Column(Float, default=0.0)
+    balance = Column(Numeric(18, 2), default=0.0)
+    total_earned = Column(Numeric(18, 2), default=0.0)
+    total_spent = Column(Numeric(18, 2), default=0.0)
     created_at = Column(DateTime, default=get_china_time)
     last_active = Column(DateTime, default=get_china_time)
 
     __table_args__ = (
+        UniqueConstraint('group_id', 'user_id', name='uq_user_group'),
         {'sqlite_autoincrement': True},
     )
 
@@ -68,7 +69,7 @@ class SignInRecord(Base):
     group_id = Column(String, nullable=False)
     user_id = Column(String, nullable=False)
     sign_date = Column(String, nullable=False)
-    reward_amount = Column(Float, default=0.0)
+    reward_amount = Column(Numeric(18, 2), default=0.0)
     consecutive_days = Column(Integer, default=1)
 
 
@@ -79,8 +80,8 @@ class TransferRecord(Base):
     from_user = Column(String, nullable=False)
     to_user = Column(String, nullable=False)
     group_id = Column(String, nullable=False)
-    amount = Column(Float, nullable=False)
-    fee = Column(Float, default=0.0)
+    amount = Column(Numeric(18, 2), nullable=False)
+    fee = Column(Numeric(18, 2), default=0.0)
     created_at = Column(DateTime, default=get_china_time)
 
 
@@ -250,7 +251,7 @@ class PaidCommand(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     group_id = Column(String, nullable=False)
     command = Column(String, nullable=False)
-    cost = Column(Float, default=0.0)
+    cost = Column(Numeric(18, 2), default=0.0)
     description = Column(String, default='')
     enabled = Column(Integer, default=1)
 

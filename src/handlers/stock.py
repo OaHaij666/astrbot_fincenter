@@ -3,12 +3,10 @@
 处理股市查看、买卖、K线图、新闻等指令。
 ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给绘图和展示层。
 """
-import os
-import tempfile
 import asyncio
 
 from ..core.database import StockHistory, get_china_time
-from ..utils import plotter
+from ..utils import plotter, save_temp_image, cleanup_temp_image
 
 
 class StockHandler:
@@ -26,7 +24,7 @@ class StockHandler:
         with self.plugin.db.session_scope() as session:
             for code in codes:
                 history = session.query(StockHistory).filter_by(
-                    code=code
+                    group_id=group_id, code=code
                 ).order_by(StockHistory.timestamp.desc()).limit(2).all()
                 if len(history) >= 2:
                     prev_prices[code] = history[1].close
@@ -59,7 +57,7 @@ class StockHandler:
         with self.plugin.db.session_scope() as session:
             for code in codes:
                 history = session.query(StockHistory).filter_by(
-                    code=code
+                    group_id=group_id, code=code
                 ).order_by(StockHistory.timestamp.desc()).limit(fetch_limit).all()
                 if history:
                     history_dicts = [h.to_kline_dict() for h in reversed(history)]
@@ -86,10 +84,10 @@ class StockHandler:
                 pass
         return img_buf
 
-    async def _build_kline_image(self, code, limit):
+    async def _build_kline_image(self, code, limit, group_id):
         with self.plugin.db.session_scope() as session:
             history = session.query(StockHistory).filter_by(
-                code=code
+                group_id=group_id, code=code
             ).order_by(StockHistory.timestamp.desc()).limit(limit).all()
             history_dicts = [h.to_kline_dict() for h in reversed(history)]
 
@@ -102,15 +100,6 @@ class StockHandler:
             tech_levels=tech_levels,
             font_key=self.plugin.config.stock.stock_font,
         )
-
-    def _save_temp_image(self, buf):
-        try:
-            fd, path = tempfile.mkstemp(suffix=".png")
-            with os.fdopen(fd, 'wb') as f:
-                f.write(buf.getvalue())
-            return path
-        except Exception:
-            return None
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if not self.plugin.stock_market:
@@ -136,7 +125,7 @@ class StockHandler:
                 tips=[f'代码列表请先查看 /fc stock market，买入前建议先看K线'],
             )
             if img_buf:
-                path = self._save_temp_image(img_buf)
+                path = save_temp_image(img_buf)
                 if path:
                     yield event.image_result(path)
                     return
@@ -148,7 +137,7 @@ class StockHandler:
         if sub == "market":
             img_buf = await self._build_market_image(group_id, user_id)
             if img_buf:
-                img_path = self._save_temp_image(img_buf)
+                img_path = save_temp_image(img_buf)
                 if img_path:
                     yield event.image_result(img_path)
                 else:
@@ -162,7 +151,7 @@ class StockHandler:
                 yield event.plain_result("格式: /fc stock buy <代码> <数量>")
                 return
             code = args[3].upper()
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None, self.plugin.stock_market.execute_buy, group_id, user_id, code, args[4]
             )
@@ -173,7 +162,7 @@ class StockHandler:
                 yield event.plain_result("格式: /fc stock sell <代码> <数量>")
                 return
             code = args[3].upper()
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None, self.plugin.stock_market.execute_sell, group_id, user_id, code, args[4]
             )
@@ -215,9 +204,9 @@ class StockHandler:
                 except ValueError:
                     pass
 
-            img_buf = await self._build_kline_image(code, limit)
+            img_buf = await self._build_kline_image(code, limit, group_id)
             if img_buf:
-                img_path = self._save_temp_image(img_buf)
+                img_path = save_temp_image(img_buf)
                 if img_path:
                     yield event.image_result(img_path)
                 else:

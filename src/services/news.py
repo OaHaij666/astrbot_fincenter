@@ -107,7 +107,8 @@ def parse_event_from_news(news_text):
 
 def generate_template_news(company_name, event_type):
     template = random.choice(NEWS_TEMPLATES)
-    content = template.format(name=company_name)
+    safe_name = company_name.replace('{', '{{').replace('}', '}}')
+    content = template.format(name=safe_name)
     content += f" [EVENT: {event_type.value}]"
     return content
 
@@ -148,12 +149,18 @@ class StockNewsGenerator:
             if parsed_type != StockEventType.NEUTRAL:
                 event_type = parsed_type
                 impact = EVENT_IMPACTS[event_type]
+            else:
+                event_type = StockEventType.NEUTRAL
+                impact = EVENT_IMPACTS[event_type]
         elif self.news_source == "both":
             if random.random() < 0.5:
                 content = self._generate_llm_news(company_code, company_name, current_price, trend_level, description, history_news)
                 parsed_type = parse_event_from_news(content)
                 if parsed_type != StockEventType.NEUTRAL:
                     event_type = parsed_type
+                    impact = EVENT_IMPACTS[event_type]
+                else:
+                    event_type = StockEventType.NEUTRAL
                     impact = EVENT_IMPACTS[event_type]
             else:
                 content = generate_template_news(company_name, event_type)
@@ -210,13 +217,16 @@ class StockNewsGenerator:
             for h in history_news:
                 history_items.append(f"- {h['event_type']}: {h['content']}")
             history_text = "\n\n近期历史新闻:\n" + "\n".join(history_items)
+        safe_name = company_name.replace('{', '{{').replace('}', '}}')
+        safe_description = description.replace('{', '{{').replace('}', '}}')
+        safe_history = history_text.replace('{', '{{').replace('}', '}}')
         prompt = prompt_template.format(
-            name=company_name,
+            name=safe_name,
             code=company_code,
             current_price=current_price,
             trend_description=get_trend_description(trend_level),
-            description=description,
-            history=history_text,
+            description=safe_description,
+            history=safe_history,
         )
         try:
             from astrbot.api.all import llm_tool_call

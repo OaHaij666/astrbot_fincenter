@@ -43,11 +43,19 @@ class CurrencyConfig:
     def from_dict(cls, data: dict) -> CurrencyConfig:
         if not data:
             return cls()
+        try:
+            initial_balance = float(data.get("initial_balance", 1000.0))
+        except (ValueError, TypeError):
+            initial_balance = 1000.0
+        try:
+            open_account_cost = float(data.get("open_account_cost", 0.0))
+        except (ValueError, TypeError):
+            open_account_cost = 0.0
         return cls(
             currency_name=str(data.get("currency_name", "金币")),
             currency_icon=str(data.get("currency_icon", "💰")),
-            initial_balance=float(data.get("initial_balance", 1000.0)),
-            open_account_cost=float(data.get("open_account_cost", 0.0)),
+            initial_balance=initial_balance,
+            open_account_cost=open_account_cost,
         )
 
 
@@ -64,12 +72,28 @@ class SigninConfig:
     def from_dict(cls, data: dict) -> SigninConfig:
         if not data:
             return cls()
+        try:
+            signin_reward_base = float(data.get("signin_reward_base", 100.0))
+        except (ValueError, TypeError):
+            signin_reward_base = 100.0
+        try:
+            signin_reward_var = float(data.get("signin_reward_var", 50.0))
+        except (ValueError, TypeError):
+            signin_reward_var = 50.0
+        try:
+            signin_consecutive_bonus = float(data.get("signin_consecutive_bonus", 20.0))
+        except (ValueError, TypeError):
+            signin_consecutive_bonus = 20.0
+        try:
+            signin_max_consecutive = int(data.get("signin_max_consecutive", 7))
+        except (ValueError, TypeError):
+            signin_max_consecutive = 7
         return cls(
             signin_enabled=bool(data.get("signin_enabled", True)),
-            signin_reward_base=float(data.get("signin_reward_base", 100.0)),
-            signin_reward_var=float(data.get("signin_reward_var", 50.0)),
-            signin_consecutive_bonus=float(data.get("signin_consecutive_bonus", 20.0)),
-            signin_max_consecutive=int(data.get("signin_max_consecutive", 7)),
+            signin_reward_base=signin_reward_base,
+            signin_reward_var=signin_reward_var,
+            signin_consecutive_bonus=signin_consecutive_bonus,
+            signin_max_consecutive=signin_max_consecutive,
         )
 
 
@@ -85,11 +109,23 @@ class ChatRewardConfig:
     def from_dict(cls, data: dict) -> ChatRewardConfig:
         if not data:
             return cls()
+        try:
+            chat_reward_amount = float(data.get("chat_reward_amount", 1.0))
+        except (ValueError, TypeError):
+            chat_reward_amount = 1.0
+        try:
+            chat_reward_cooldown = int(data.get("chat_reward_cooldown", 60))
+        except (ValueError, TypeError):
+            chat_reward_cooldown = 60
+        try:
+            chat_reward_daily_limit = int(data.get("chat_reward_daily_limit", 50))
+        except (ValueError, TypeError):
+            chat_reward_daily_limit = 50
         return cls(
             chat_reward_enabled=bool(data.get("chat_reward_enabled", True)),
-            chat_reward_amount=float(data.get("chat_reward_amount", 1.0)),
-            chat_reward_cooldown=int(data.get("chat_reward_cooldown", 60)),
-            chat_reward_daily_limit=int(data.get("chat_reward_daily_limit", 50)),
+            chat_reward_amount=chat_reward_amount,
+            chat_reward_cooldown=chat_reward_cooldown,
+            chat_reward_daily_limit=chat_reward_daily_limit,
         )
 
 
@@ -111,16 +147,32 @@ class StockConfig:
     def from_dict(cls, data: dict) -> StockConfig:
         if not data:
             return cls()
+        try:
+            stock_volatility = float(data.get("stock_volatility", 0.02))
+        except (ValueError, TypeError):
+            stock_volatility = 0.02
+        try:
+            stock_update_interval = int(data.get("stock_update_interval", 300))
+        except (ValueError, TypeError):
+            stock_update_interval = 300
+        try:
+            stock_fee_rate = float(data.get("stock_fee_rate", 0.001))
+        except (ValueError, TypeError):
+            stock_fee_rate = 0.001
+        try:
+            stock_kline_candles = int(data.get("stock_kline_candles", 50))
+        except (ValueError, TypeError):
+            stock_kline_candles = 50
         return cls(
             stock_enabled=bool(data.get("stock_enabled", True)),
             stock_companies=list(data.get("stock_companies", [])),
-            stock_volatility=float(data.get("stock_volatility", 0.02)),
-            stock_update_interval=int(data.get("stock_update_interval", 300)),
-            stock_fee_rate=float(data.get("stock_fee_rate", 0.001)),
+            stock_volatility=stock_volatility,
+            stock_update_interval=stock_update_interval,
+            stock_fee_rate=stock_fee_rate,
             stock_trading_hours=bool(data.get("stock_trading_hours", False)),
             stock_trend_enabled=bool(data.get("stock_trend_enabled", True)),
             stock_tech_analysis_enabled=bool(data.get("stock_tech_analysis_enabled", True)),
-            stock_kline_candles=int(data.get("stock_kline_candles", 50)),
+            stock_kline_candles=stock_kline_candles,
             stock_font=str(data.get("stock_font", "")),
         )
 
@@ -148,22 +200,62 @@ class StockNewsConfig:
     def from_dict(cls, data: dict) -> StockNewsConfig:
         if not data:
             return cls()
+        try:
+            stock_news_trigger_prob = float(data.get("stock_news_trigger_prob", 0.3))
+        except (ValueError, TypeError):
+            stock_news_trigger_prob = 0.3
+        try:
+            stock_news_history_count = int(data.get("stock_news_history_count", 10))
+        except (ValueError, TypeError):
+            stock_news_history_count = 10
+        try:
+            stock_news_prob_major_positive = float(data.get("stock_news_prob_major_positive", 0.05))
+        except (ValueError, TypeError):
+            stock_news_prob_major_positive = 0.05
+        try:
+            stock_news_prob_positive = float(data.get("stock_news_prob_positive", 0.15))
+        except (ValueError, TypeError):
+            stock_news_prob_positive = 0.15
+        try:
+            stock_news_prob_slight_positive = float(data.get("stock_news_prob_slight_positive", 0.20))
+        except (ValueError, TypeError):
+            stock_news_prob_slight_positive = 0.20
+        try:
+            stock_news_prob_neutral = float(data.get("stock_news_prob_neutral", 0.25))
+        except (ValueError, TypeError):
+            stock_news_prob_neutral = 0.25
+        try:
+            stock_news_prob_slight_negative = float(data.get("stock_news_prob_slight_negative", 0.20))
+        except (ValueError, TypeError):
+            stock_news_prob_slight_negative = 0.20
+        try:
+            stock_news_prob_negative = float(data.get("stock_news_prob_negative", 0.12))
+        except (ValueError, TypeError):
+            stock_news_prob_negative = 0.12
+        try:
+            stock_news_prob_major_negative = float(data.get("stock_news_prob_major_negative", 0.03))
+        except (ValueError, TypeError):
+            stock_news_prob_major_negative = 0.03
+        try:
+            stock_news_prob_volatility = float(data.get("stock_news_prob_volatility", 0.10))
+        except (ValueError, TypeError):
+            stock_news_prob_volatility = 0.10
         return cls(
             stock_news_enabled=bool(data.get("stock_news_enabled", True)),
             stock_news_source=str(data.get("stock_news_source", "template")),
-            stock_news_trigger_prob=float(data.get("stock_news_trigger_prob", 0.3)),
+            stock_news_trigger_prob=stock_news_trigger_prob,
             stock_news_broadcast=bool(data.get("stock_news_broadcast", True)),
-            stock_news_history_count=int(data.get("stock_news_history_count", 10)),
+            stock_news_history_count=stock_news_history_count,
             stock_news_provider_id=str(data.get("stock_news_provider_id", "")),
             stock_llm_prompt_template=str(data.get("stock_llm_prompt_template", "")),
-            stock_news_prob_major_positive=float(data.get("stock_news_prob_major_positive", 0.05)),
-            stock_news_prob_positive=float(data.get("stock_news_prob_positive", 0.15)),
-            stock_news_prob_slight_positive=float(data.get("stock_news_prob_slight_positive", 0.20)),
-            stock_news_prob_neutral=float(data.get("stock_news_prob_neutral", 0.25)),
-            stock_news_prob_slight_negative=float(data.get("stock_news_prob_slight_negative", 0.20)),
-            stock_news_prob_negative=float(data.get("stock_news_prob_negative", 0.12)),
-            stock_news_prob_major_negative=float(data.get("stock_news_prob_major_negative", 0.03)),
-            stock_news_prob_volatility=float(data.get("stock_news_prob_volatility", 0.10)),
+            stock_news_prob_major_positive=stock_news_prob_major_positive,
+            stock_news_prob_positive=stock_news_prob_positive,
+            stock_news_prob_slight_positive=stock_news_prob_slight_positive,
+            stock_news_prob_neutral=stock_news_prob_neutral,
+            stock_news_prob_slight_negative=stock_news_prob_slight_negative,
+            stock_news_prob_negative=stock_news_prob_negative,
+            stock_news_prob_major_negative=stock_news_prob_major_negative,
+            stock_news_prob_volatility=stock_news_prob_volatility,
         )
 
     def to_dict(self) -> dict:
@@ -197,12 +289,24 @@ class GoodsConfig:
     def from_dict(cls, data: dict) -> GoodsConfig:
         if not data:
             return cls()
+        try:
+            goods_refresh_interval = int(data.get("goods_refresh_interval", 86400))
+        except (ValueError, TypeError):
+            goods_refresh_interval = 86400
+        try:
+            goods_price_volatility = float(data.get("goods_price_volatility", 0.1))
+        except (ValueError, TypeError):
+            goods_price_volatility = 0.1
+        try:
+            goods_user_trade_tax = float(data.get("goods_user_trade_tax", 0.05))
+        except (ValueError, TypeError):
+            goods_user_trade_tax = 0.05
         return cls(
             goods_enabled=bool(data.get("goods_enabled", True)),
-            goods_refresh_interval=int(data.get("goods_refresh_interval", 86400)),
-            goods_price_volatility=float(data.get("goods_price_volatility", 0.1)),
+            goods_refresh_interval=goods_refresh_interval,
+            goods_price_volatility=goods_price_volatility,
             goods_user_trade_enabled=bool(data.get("goods_user_trade_enabled", True)),
-            goods_user_trade_tax=float(data.get("goods_user_trade_tax", 0.05)),
+            goods_user_trade_tax=goods_user_trade_tax,
         )
 
 
@@ -220,9 +324,13 @@ class PaidCmdConfig:
     def from_dict(cls, data: dict) -> PaidCmdConfig:
         if not data:
             return cls()
+        try:
+            paid_cmd_default_cost = float(data.get("paid_cmd_default_cost", 50.0))
+        except (ValueError, TypeError):
+            paid_cmd_default_cost = 50.0
         return cls(
             paid_cmd_enabled=bool(data.get("paid_cmd_enabled", False)),
-            paid_cmd_default_cost=float(data.get("paid_cmd_default_cost", 50.0)),
+            paid_cmd_default_cost=paid_cmd_default_cost,
             paid_cmd_insufficient_msg=str(data.get("paid_cmd_insufficient_msg",
                 "💸 余额不足！执行该指令需要 {cost} {currency}，你当前余额为 {balance} {currency}。")),
             paid_cmd_deduct_msg=str(data.get("paid_cmd_deduct_msg", "")),

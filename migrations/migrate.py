@@ -26,7 +26,7 @@ def backup_database():
         return False
 
     if not os.path.exists(BACKUP_DIR):
-        os.makedirs(BACKUP_DIR)
+        os.makedirs(BACKUP_DIR, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     backup_file = os.path.join(BACKUP_DIR, f"fincenter.db.{timestamp}.bak")
