@@ -207,8 +207,8 @@ class FinCenterPlugin(Star):
                     if elapsed < cfg.chat_reward_cooldown:
                         return
 
-            user.balance += cfg.chat_reward_amount
-            user.total_earned += cfg.chat_reward_amount
+            user.add_balance(cfg.chat_reward_amount)
+            user.add_earned(cfg.chat_reward_amount)
             state.last_reward_time = now
             state.daily_count += 1
 
@@ -259,8 +259,8 @@ class FinCenterPlugin(Star):
                     balance=user.balance,
                 )
 
-            user.balance -= paid_cmd.cost
-            user.total_spent += paid_cmd.cost
+            user.sub_balance(paid_cmd.cost)
+            user.add_spent(paid_cmd.cost)
 
             if cfg.paid_cmd_deduct_msg:
                 return cfg.paid_cmd_deduct_msg.format(

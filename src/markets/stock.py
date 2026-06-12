@@ -681,8 +681,8 @@ class StockMarket:
                 if user.balance < cost_with_fee:
                     return {"success": False, "msg": f"余额不足。需要 {cost_with_fee:.2f}，当前余额 {user.balance:.2f}"}
 
-                user.balance -= cost_with_fee
-                user.total_spent += cost_with_fee
+                user.sub_balance(cost_with_fee)
+                user.add_spent(cost_with_fee)
 
                 holding = session.query(StockHolding).filter_by(
                     group_id=group_id, user_id=user_id, code=code
@@ -755,8 +755,8 @@ class StockMarket:
                     group_id=group_id, user_id=user_id
                 ).first()
                 if user:
-                    user.balance += revenue_after_fee
-                    user.total_earned += revenue_after_fee
+                    user.add_balance(revenue_after_fee)
+                    user.add_earned(revenue_after_fee)
 
         return {
             "success": True,

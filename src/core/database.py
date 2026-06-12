@@ -6,11 +6,19 @@
 """
 import requests
 from contextlib import contextmanager
+from decimal import Decimal
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, text, Numeric, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timedelta, timezone
 
 Base = declarative_base()
+
+
+def _to_decimal(value):
+    """将任意数值安全转为 Decimal，避免 Decimal + float 类型错误"""
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
 
 _time_offset = 0
 
@@ -60,6 +68,19 @@ class UserAccount(Base):
         UniqueConstraint('group_id', 'user_id', name='uq_user_group'),
         {'sqlite_autoincrement': True},
     )
+
+    def add_balance(self, amount):
+        """安全加余额，处理 Decimal + float 类型不兼容"""
+        self.balance = (self.balance or 0) + _to_decimal(amount)
+
+    def add_earned(self, amount):
+        self.total_earned = (self.total_earned or 0) + _to_decimal(amount)
+
+    def add_spent(self, amount):
+        self.total_spent = (self.total_spent or 0) + _to_decimal(amount)
+
+    def sub_balance(self, amount):
+        self.balance = (self.balance or 0) - _to_decimal(amount)
 
 
 class SignInRecord(Base):

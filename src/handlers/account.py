@@ -179,8 +179,8 @@ class AccountHandler:
             )
             session.add(record)
 
-            user.balance += total_reward
-            user.total_earned += total_reward
+            user.add_balance(total_reward)
+            user.add_earned(total_reward)
 
         currency_name = self.plugin.config.currency.currency_name
         currency_icon = self.plugin.config.currency.currency_icon
@@ -244,9 +244,9 @@ class AccountHandler:
                 yield event.plain_result("目标用户未开户")
                 return
 
-            from_user.balance -= amount
-            to_user.balance += amount
-            to_user.total_earned += amount
+            from_user.sub_balance(amount)
+            to_user.add_balance(amount)
+            to_user.add_earned(amount)
 
             record = TransferRecord(
                 from_user=user_id,

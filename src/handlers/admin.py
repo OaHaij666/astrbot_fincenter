@@ -131,9 +131,9 @@ class AdminHandler:
                     yield event.plain_result("目标用户不存在")
                     return
 
-                user.balance += amount
+                user.add_balance(amount)
                 if amount > 0:
-                    user.total_earned += amount
+                    user.add_earned(amount)
 
             yield event.plain_result(
                 f"✅ 已为 {target_id} {'增加' if amount > 0 else '减少'} "

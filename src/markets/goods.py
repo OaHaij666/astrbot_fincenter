@@ -193,7 +193,7 @@ class GoodsMarket:
                         group_id=group_id, user_id=bp.user_id
                     ).first()
                     if user:
-                        user.balance += refund
+                        user.add_balance(refund)
                 session.delete(bp)
 
             preview_image = definition.preview_image
@@ -245,8 +245,8 @@ class GoodsMarket:
                 if user.balance < total_cost:
                     return {"success": False, "msg": f"余额不足。需要 {total_cost:.2f}，当前余额 {user.balance:.2f}"}
 
-                user.balance -= total_cost
-                user.total_spent += total_cost
+                user.sub_balance(total_cost)
+                user.add_spent(total_cost)
 
                 backpack = session.query(UserBackpack).filter_by(
                     group_id=group_id, user_id=user_id, goods_id=goods_id
@@ -307,8 +307,8 @@ class GoodsMarket:
                     group_id=group_id, user_id=user_id
                 ).first()
                 if user:
-                    user.balance += total_revenue
-                    user.total_earned += total_revenue
+                    user.add_balance(total_revenue)
+                    user.add_earned(total_revenue)
 
                 price = market.current_price
 
@@ -435,13 +435,13 @@ class GoodsMarket:
             if seller_backpack.amount < 0.0001:
                 session.delete(seller_backpack)
 
-            buyer.balance -= cost_with_fee
+            buyer.sub_balance(cost_with_fee)
 
             seller = session.query(UserAccount).filter_by(
                 group_id=group_id, user_id=trade.from_user
             ).first()
             if seller:
-                seller.balance += total_cost
+                seller.add_balance(total_cost)
 
             buyer_backpack = session.query(UserBackpack).filter_by(
                 group_id=group_id, user_id=user_id, goods_id=trade.goods_id
