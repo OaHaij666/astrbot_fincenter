@@ -6,6 +6,7 @@ ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给
 """
 import asyncio
 import base64
+import os
 
 from astrbot.api import logger
 from ..core.database import StockHistory, get_china_time
@@ -38,6 +39,12 @@ class StockHandler:
                 b64 = base64.b64encode(image_data).decode("utf-8")
                 return f"base64://{b64}"
             elif isinstance(image_data, str):
+                # str 可能是文件路径，读取后转 base64（对齐参考项目）
+                if os.path.isfile(image_data):
+                    with open(image_data, "rb") as f:
+                        file_data = f.read()
+                    b64 = base64.b64encode(file_data).decode("utf-8")
+                    return f"base64://{b64}"
                 return image_data
             else:
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")

@@ -3,7 +3,6 @@
 AstrBot 要求插件类定义在根 main.py，handler 的 __module__ 才会与框架的
 module_path 匹配，从而正确绑定 self。
 
-完全对齐参考项目 astrbot_plugin_qq_group_daily_analysis 的模式：
   - 使用 @filter.command() 平级注册，不使用 command_group
   - html_render 调用签名: html_render(html_content, data_dict, return_url, options)
   - 图片通过 event.image_result() 发送
@@ -151,6 +150,13 @@ class FinCenterPlugin(Star):
                 b64 = base64.b64encode(image_data).decode("utf-8")
                 return f"base64://{b64}"
             elif isinstance(image_data, str):
+                # str 可能是文件路径，读取后转 base64（对齐参考项目）
+                if os.path.isfile(image_data):
+                    with open(image_data, "rb") as f:
+                        file_data = f.read()
+                    b64 = base64.b64encode(file_data).decode("utf-8")
+                    return f"base64://{b64}"
+                # 也可能是已有的 URL
                 return image_data
             else:
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")

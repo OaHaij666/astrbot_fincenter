@@ -6,6 +6,7 @@
 图片渲染对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
 """
 import base64
+import os
 
 from astrbot.api import logger
 from ..core.database import UserAccount, GoodsDefinition, GoodsMarketPrice
@@ -38,6 +39,12 @@ class AdminHandler:
                 b64 = base64.b64encode(image_data).decode("utf-8")
                 return f"base64://{b64}"
             elif isinstance(image_data, str):
+                # str 可能是文件路径，读取后转 base64（对齐参考项目）
+                if os.path.isfile(image_data):
+                    with open(image_data, "rb") as f:
+                        file_data = f.read()
+                    b64 = base64.b64encode(file_data).decode("utf-8")
+                    return f"base64://{b64}"
                 return image_data
             else:
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
