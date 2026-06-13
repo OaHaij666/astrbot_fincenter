@@ -2,7 +2,7 @@
 
 处理余额管理、股市控制、物资管理等管理员指令。
 排行榜已移至普通用户指令，此处仅保留管理员入口。
-图片渲染对齐参考项目: html_render → 文件路径 → OneBot API 直接发送
+图片渲染对齐参考项目: html_render → 文件路径 → event.image_result(文件路径)
 """
 import os
 import tempfile
@@ -41,10 +41,6 @@ class AdminHandler:
         except Exception as e:
             logger.error(f"html_render failed: {e}")
             return None
-
-    async def _send_image(self, event, image_path):
-        """通过 OneBot API 发送图片"""
-        return await self.plugin._send_image_via_onebot(event, image_path)
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if str(user_id) not in self.plugin.config.basic.admin_ids:
@@ -89,9 +85,8 @@ class AdminHandler:
                 html_content, data = result
                 image_path = await self._render_image(html_content, data)
                 if image_path:
-                    sent = await self._send_image(event, image_path)
-                    if sent:
-                        return
+                    yield event.image_result(image_path)
+                    return
             yield event.plain_result(self._get_admin_help_text())
             return
 
@@ -338,7 +333,7 @@ class AdminHandler:
             html_content, data = result
             image_path = await self._render_image(html_content, data)
             if image_path:
-                await self._send_image(event, image_path)
+                yield event.image_result(image_path)
             else:
                 yield event.plain_result("排行榜图片生成失败")
         else:

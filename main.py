@@ -130,17 +130,10 @@ class FinCenterPlugin(Star):
         return True
 
     # ── 图片渲染与发送 ────────────────────────────────────────
-    # 对齐参考项目:
-    #   html_render(html_content, data_dict, return_url=False, options) → 返回文件路径(str) 或 bytes
-    #   通过 OneBot API 直接发送图片，不走 event.image_result()
-    #   OneBot API 支持 file:/// 路径
-
-    async def _render_and_send_image(self, event, html_content, data=None, options=None):
-        """渲染 HTML 为图片并通过 OneBot API 发送，失败返回 False"""
-        image_path = await self._render_image(html_content, data, options)
-        if not image_path:
-            return False
-        return await self._send_image_via_onebot(event, image_path)
+    # 对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
+    # 返回文件路径(str) 或 bytes
+    # 通过 event.image_result(文件路径) 发送，框架自动处理文件读取和上传
+    # 必须用 yield 返回结果，否则框架不知道已响应，会继续走 LLM
 
     async def _render_image(self, html_content, data=None, options=None):
         """调用框架 html_render 渲染 HTML 为图片，返回文件路径或 None"""
@@ -167,33 +160,6 @@ class FinCenterPlugin(Star):
         except Exception as e:
             logger.error(f"html_render failed: {e}")
             return None
-
-    async def _send_image_via_onebot(self, event, image_path: str) -> bool:
-        """通过 OneBot API 直接发送图片，对齐参考项目 adapter.send_image()"""
-        try:
-            bot = event.bot
-            group_id = self._extract_group_id(event)
-
-            if os.path.isfile(image_path):
-                abs_path = os.path.abspath(image_path)
-                if abs_path.startswith("/"):
-                    file_val = f"file://{abs_path}"
-                else:
-                    file_val = f"file:///{abs_path}"
-            else:
-                file_val = image_path
-
-            messages = [{"type": "image", "data": {"file": file_val}}]
-
-            origin = getattr(event, "unified_msg_origin", "") or ""
-            if "Group" in origin:
-                await bot.call_action("send_group_msg", group_id=int(group_id), message=messages)
-            else:
-                await bot.call_action("send_private_msg", user_id=int(event.get_sender_id()), message=messages)
-            return True
-        except Exception as e:
-            logger.error(f"OneBot 发送图片失败: {e}")
-            return False
 
     def _process_chat_reward(self, group_id: str, user_id: str, user_name: str):
         cfg = self.config.chat_reward
@@ -356,8 +322,9 @@ class FinCenterPlugin(Star):
             )
             if result:
                 html_content, data = result
-                sent = await self._render_and_send_image(event, html_content, data)
-                if sent:
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    yield event.image_result(image_path)
                     return
             yield event.plain_result(self._get_main_help_text())
             return

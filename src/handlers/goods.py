@@ -1,7 +1,7 @@
 """物资市场处理器
 
 处理物资市场查看、买卖、背包查看等指令。
-图片渲染对齐参考项目: html_render → 文件路径 → OneBot API 直接发送
+图片渲染对齐参考项目: html_render → 文件路径 → event.image_result(文件路径)
 """
 import os
 import tempfile
@@ -40,10 +40,6 @@ class GoodsHandler:
             logger.error(f"html_render failed: {e}")
             return None
 
-    async def _send_image(self, event, image_path):
-        """通过 OneBot API 发送图片"""
-        return await self.plugin._send_image_via_onebot(event, image_path)
-
     async def handle(self, event, args, group_id, user_id, user_name):
         if not self.plugin.goods_market:
             yield event.plain_result("物资市场模块未启用")
@@ -68,9 +64,8 @@ class GoodsHandler:
                 html_content, data = result
                 image_path = await self._render_image(html_content, data)
                 if image_path:
-                    sent = await self._send_image(event, image_path)
-                    if sent:
-                        return
+                    yield event.image_result(image_path)
+                    return
             yield event.plain_result(self._get_goods_help_text())
             return
 
@@ -90,7 +85,7 @@ class GoodsHandler:
                 html_content, data = result
                 image_path = await self._render_image(html_content, data)
                 if image_path:
-                    await self._send_image(event, image_path)
+                    yield event.image_result(image_path)
                 else:
                     yield event.plain_result("图片生成失败")
             else:
