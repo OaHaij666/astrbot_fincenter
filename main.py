@@ -174,10 +174,19 @@ class FinCenterPlugin(Star):
                 rendered_html = html_content
 
             page = await browser.new_page(viewport={"width": 500, "height": 800})
-            await page.set_content(rendered_html, wait_until="networkidle", timeout=10000)
+            await page.set_content(rendered_html, wait_until="networkidle", timeout=15000)
 
-            # 等待内容渲染
-            await page.wait_for_timeout(300)
+            # 等待 ECharts 渲染完成（K线图需要 JS 执行）
+            await page.wait_for_timeout(500)
+            try:
+                await page.wait_for_function(
+                    "() => typeof echarts !== 'undefined'",
+                    timeout=3000
+                )
+                # 额外等待图表渲染
+                await page.wait_for_timeout(500)
+            except Exception:
+                pass  # 非 ECharts 页面忽略
 
             # 获取 body 实际尺寸，精确裁剪到内容边界
             body_size = await page.evaluate("""() => {
