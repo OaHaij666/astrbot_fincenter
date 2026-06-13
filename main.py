@@ -10,6 +10,7 @@ module_path 匹配，从而正确绑定 self。
 import base64
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 # AstrBot extracts plugins to data/plugins/<name>/ — ensure the plugin root is on sys.path
@@ -130,13 +131,90 @@ class FinCenterPlugin(Star):
         return True
 
     # ── 图片渲染与发送 ────────────────────────────────────────
-    # 对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
-    # 返回文件路径(str) 或 bytes
+    # 渲染策略：优先本地 Playwright → 回退远程 html_render → 回退文字
     # 通过 event.image_result(文件路径) 发送，框架自动处理文件读取和上传
     # 必须用 yield 返回结果，否则框架不知道已响应，会继续走 LLM
 
+    _playwright_instance = None
+    _playwright_browser = None
+
+    @classmethod
+    async def _get_playwright_browser(cls):
+        """懒加载 Playwright 浏览器实例（全局单例）"""
+        if cls._playwright_browser and cls._playwright_browser.is_connected():
+            return cls._playwright_browser
+        try:
+            from playwright.async_api import async_playwright
+            if cls._playwright_instance is None:
+                cls._playwright_instance = await async_playwright().start()
+            if cls._playwright_browser is None or not cls._playwright_browser.is_connected():
+                cls._playwright_browser = await cls._playwright_instance.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-gpu'],
+                )
+            return cls._playwright_browser
+        except Exception as e:
+            logger.warning(f"Playwright 不可用: {e}")
+            return None
+
+    async def _render_image_local(self, html_content, data=None, options=None):
+        """使用本地 Playwright 渲染 HTML 为图片，返回文件路径或 None"""
+        browser = await self._get_playwright_browser()
+        if not browser:
+            return None
+
+        import jinja2
+        page = None
+        try:
+            # Jinja2 渲染
+            if data:
+                tmpl = jinja2.Template(html_content)
+                rendered_html = tmpl.render(**data)
+            else:
+                rendered_html = html_content
+
+            page = await browser.new_page()
+            await page.set_content(rendered_html, wait_until="networkidle", timeout=10000)
+
+            # 等待内容渲染
+            await page.wait_for_timeout(200)
+
+            # 截图选项
+            opts = options or {}
+            screenshot_opts = {
+                "full_page": opts.get("full_page", True),
+                "type": opts.get("type", "png"),
+            }
+            if opts.get("quality"):
+                screenshot_opts["quality"] = opts["quality"]
+
+            img_bytes = await page.screenshot(**screenshot_opts)
+
+            # 保存到临时文件
+            suffix = ".jpg" if screenshot_opts["type"] == "jpeg" else ".png"
+            tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False, dir=self.cache_dir)
+            tmp.write(img_bytes)
+            tmp.close()
+            return tmp.name
+
+        except Exception as e:
+            logger.warning(f"本地 Playwright 渲染失败: {e}")
+            return None
+        finally:
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+
     async def _render_image(self, html_content, data=None, options=None):
-        """调用框架 html_render 渲染 HTML 为图片，返回文件路径或 None"""
+        """渲染 HTML 为图片：优先本地 Playwright，失败回退远程 html_render"""
+        # 1. 尝试本地 Playwright
+        local_path = await self._render_image_local(html_content, data, options)
+        if local_path:
+            return local_path
+
+        # 2. 回退远程 html_render
         try:
             image_data = await self.html_render(
                 html_content,
@@ -149,7 +227,6 @@ class FinCenterPlugin(Star):
             if isinstance(image_data, str):
                 return image_data
             elif isinstance(image_data, bytes):
-                import tempfile
                 tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=self.cache_dir)
                 tmp.write(image_data)
                 tmp.close()
@@ -158,7 +235,7 @@ class FinCenterPlugin(Star):
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
                 return None
         except Exception as e:
-            logger.error(f"html_render failed: {e}")
+            logger.error(f"远程 html_render 也失败: {e}")
             return None
 
     def _process_chat_reward(self, group_id: str, user_id: str, user_name: str):
@@ -394,6 +471,19 @@ class FinCenterPlugin(Star):
         if self.goods_market:
             self.goods_market.stop()
             logger.info("Goods market stopped")
+        # 关闭 Playwright
+        if self._playwright_browser:
+            try:
+                await self._playwright_browser.close()
+            except Exception:
+                pass
+            self.__class__._playwright_browser = None
+        if self._playwright_instance:
+            try:
+                await self._playwright_instance.stop()
+            except Exception:
+                pass
+            self.__class__._playwright_instance = None
 
     def __del__(self):
         if self.stock_market:
