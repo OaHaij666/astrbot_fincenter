@@ -152,7 +152,7 @@ def render_stock_market_html(market_data, holdings=None, news=None,
         market_data=market_data or [],
         holdings=holdings or [],
         news=news_list,
-        kline_images={},  # 不再使用 base64 内嵌，K线图单独渲染
+        kline_images=kline_html_list or {},
         currency_name=currency_name,
         currency_icon=currency_icon,
     )

@@ -4,6 +4,7 @@
 图片渲染对齐参考项目: html_render → 文件路径 → event.image_result(文件路径)
 """
 import asyncio
+import base64
 import os
 
 from astrbot.api import logger
@@ -54,10 +55,18 @@ class StockHandler:
                 'time': n['timestamp'].strftime("%H:%M") if n.get('timestamp') else "",
             })
 
+        # 生成每只股票的 K 线 base64 图片
+        kline_images = {}
+        for code in codes:
+            kline_b64 = await self._generate_kline_base64(code, group_id)
+            if kline_b64:
+                kline_images[code] = kline_b64
+
         result = plotter.render_stock_market_html(
             market_data, holdings_data, news_data,
             self.plugin.config.currency.currency_name,
             self.plugin.config.currency.currency_icon,
+            kline_html_list=kline_images,
         )
         if not result:
             return None
@@ -65,6 +74,45 @@ class StockHandler:
         html_content, data = result
         url = await self.plugin._render_image(html_content, data)
         return url
+
+    async def _generate_kline_base64(self, code, group_id, limit=30):
+        """生成单只股票 K 线的 base64 图片字符串"""
+        with self.plugin.db.session_scope() as session:
+            history = session.query(StockHistory).filter_by(
+                group_id=group_id, code=code
+            ).order_by(StockHistory.timestamp.desc()).limit(limit).all()
+            history_dicts = [h.to_kline_dict() for h in reversed(history)]
+
+        if not history_dicts:
+            return None
+
+        tech_levels = self.plugin.stock_market.get_tech_levels(code)
+        result = plotter.render_kline_html(
+            history_dicts, title=f"{code} K线走势",
+            tech_levels=tech_levels,
+            max_candles=self.plugin.config.stock.stock_kline_candles,
+            font_key=self.plugin.config.stock.stock_font,
+        )
+        if not result:
+            return None
+
+        html_content, data = result
+        image_path = await self.plugin._render_image(html_content, data)
+        if not image_path:
+            return None
+
+        try:
+            with open(image_path, "rb") as f:
+                img_bytes = f.read()
+            return base64.b64encode(img_bytes).decode("utf-8")
+        except Exception as e:
+            logger.warning(f"读取 K 线图片失败 {code}: {e}")
+            return None
+        finally:
+            try:
+                os.unlink(image_path)
+            except Exception:
+                pass
 
     async def _build_kline_image(self, code, limit, group_id):
         with self.plugin.db.session_scope() as session:

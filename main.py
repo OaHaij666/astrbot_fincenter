@@ -173,17 +173,32 @@ class FinCenterPlugin(Star):
             else:
                 rendered_html = html_content
 
-            page = await browser.new_page()
+            page = await browser.new_page(viewport={"width": 500, "height": 800})
             await page.set_content(rendered_html, wait_until="networkidle", timeout=10000)
 
             # 等待内容渲染
-            await page.wait_for_timeout(200)
+            await page.wait_for_timeout(300)
 
-            # 截图选项
+            # 获取 body 实际尺寸，精确裁剪到内容边界
+            body_size = await page.evaluate("""() => {
+                const body = document.body;
+                const html = document.documentElement;
+                return {
+                    width: Math.min(Math.max(body.scrollWidth, body.offsetWidth), 600),
+                    height: Math.max(body.scrollHeight, body.offsetHeight)
+                };
+            }""")
+
+            # 截图选项 - 用 clip 精确裁剪，避免右侧空白
             opts = options or {}
             screenshot_opts = {
-                "full_page": opts.get("full_page", True),
                 "type": opts.get("type", "png"),
+                "clip": {
+                    "x": 0,
+                    "y": 0,
+                    "width": body_size["width"],
+                    "height": body_size["height"],
+                },
             }
             if opts.get("quality"):
                 screenshot_opts["quality"] = opts["quality"]
