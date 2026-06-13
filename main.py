@@ -88,7 +88,7 @@ class FinCenterPlugin(Star):
         migrate()
 
     def _setup_handlers(self):
-        self.account_handler = AccountHandler(self)
+        self.account_handler = AccountHandler(self, self.html_render)
         self.stock_handler = StockHandler(self, self.html_render)
         self.goods_handler = GoodsHandler(self, self.html_render)
         self.admin_handler = AdminHandler(self, self.html_render)

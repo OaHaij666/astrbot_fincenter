@@ -223,13 +223,13 @@ class StockMarket:
             snap = {}
             for code in self.prices:
                 snap[code] = {
-                    "price": self.prices[code],
+                    "price": float(self.prices[code]),
                     "trend": self.trend_levels.get(code, 0),
-                    "open": self.current_candles[code]["open"],
-                    "high": self.current_candles[code]["high"],
-                    "low": self.current_candles[code]["low"],
-                    "close": self.current_candles[code]["close"],
-                    "volume": self.current_candles[code]["volume"] + self.current_candles[code]["simulated_volume"],
+                    "open": float(self.current_candles[code]["open"]),
+                    "high": float(self.current_candles[code]["high"]),
+                    "low": float(self.current_candles[code]["low"]),
+                    "close": float(self.current_candles[code]["close"]),
+                    "volume": float(self.current_candles[code]["volume"] + self.current_candles[code]["simulated_volume"]),
                 }
         with self._snapshot_lock:
             self._price_snapshot = snap
@@ -775,14 +775,16 @@ class StockMarket:
             result = []
             for h in holdings:
                 if h.amount > 0.0001:
-                    current_price = self.prices.get(h.code, 0)
-                    market_value = h.amount * current_price
-                    profit = (current_price - h.avg_cost) * h.amount
-                    profit_pct = ((current_price - h.avg_cost) / h.avg_cost * 100) if h.avg_cost > 0 else 0
+                    current_price = float(self.prices.get(h.code, 0))
+                    amount = float(h.amount)
+                    avg_cost = float(h.avg_cost)
+                    market_value = amount * current_price
+                    profit = (current_price - avg_cost) * amount
+                    profit_pct = ((current_price - avg_cost) / avg_cost * 100) if avg_cost > 0 else 0
                     result.append({
                         "code": h.code,
-                        "amount": h.amount,
-                        "avg_cost": h.avg_cost,
+                        "amount": amount,
+                        "avg_cost": avg_cost,
                         "current_price": current_price,
                         "market_value": market_value,
                         "profit": profit,

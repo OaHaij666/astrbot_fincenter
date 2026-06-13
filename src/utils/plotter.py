@@ -250,6 +250,41 @@ def render_help_html(title, sections, tips=None, quick_ref=None,
     return (html_content, {})
 
 
+def render_account_html(user_name, balance, total_earned, total_spent,
+                        created_at, currency_name="金币", currency_icon="💰",
+                        holdings=None, backpack=None):
+    """生成账户信息 HTML
+
+    Args:
+        user_name: 用户名
+        balance: 余额
+        total_earned: 累计获得
+        total_spent: 累计消费
+        created_at: 开户时间字符串
+        currency_name: 货币名称
+        currency_icon: 货币图标
+        holdings: 股票持仓列表
+        backpack: 物资背包列表
+
+    Returns:
+        (html_content, data_dict) 元组
+    """
+    env = _get_jinja()
+    template = env.get_template('account.html')
+    html_content = template.render(
+        user_name=user_name,
+        balance=balance,
+        total_earned=total_earned,
+        total_spent=total_spent,
+        created_at=created_at,
+        currency_name=currency_name,
+        currency_icon=currency_icon,
+        holdings=holdings or [],
+        backpack=backpack or [],
+    )
+    return (html_content, {})
+
+
 async def shutdown():
     """清理资源（兼容旧接口，现在无需手动关闭浏览器）"""
     pass

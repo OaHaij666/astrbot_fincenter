@@ -148,11 +148,11 @@ class StockHistory(Base):
         """转换为 K 线图所需的字典格式"""
         return {
             'date': self.timestamp,
-            'open': self.open,
-            'high': self.high,
-            'low': self.low,
-            'close': self.close,
-            'volume': self.volume,
+            'open': float(self.open),
+            'high': float(self.high),
+            'low': float(self.low),
+            'close': float(self.close),
+            'volume': float(self.volume),
         }
 
 

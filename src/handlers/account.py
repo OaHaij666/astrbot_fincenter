@@ -4,16 +4,45 @@
 所有数据库操作通过 session_scope() 上下文管理器进行。
 """
 import random
+import tempfile
 from datetime import timedelta
 
+from astrbot.api import logger
 from ..core.database import (
     UserAccount, SignInRecord, TransferRecord, get_china_time
 )
+from ..utils import plotter
 
 
 class AccountHandler:
-    def __init__(self, plugin):
+    def __init__(self, plugin, html_render):
         self.plugin = plugin
+        self.html_render = html_render
+
+    async def _render_image(self, html_content, data=None, options=None):
+        """调用框架 html_render 渲染 HTML 为图片，返回文件路径或 None"""
+        try:
+            image_data = await self.html_render(
+                html_content,
+                data or {},
+                False,
+                options or {"type": "png"},
+            )
+            if not image_data:
+                return None
+            if isinstance(image_data, str):
+                return image_data
+            elif isinstance(image_data, bytes):
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=self.plugin.cache_dir)
+                tmp.write(image_data)
+                tmp.close()
+                return tmp.name
+            else:
+                logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
+                return None
+        except Exception as e:
+            logger.error(f"html_render failed: {e}")
+            return None
 
     async def handle_open(self, event, args, group_id, user_id, user_name):
         target_id = None
@@ -99,36 +128,47 @@ class AccountHandler:
                 return
             user.last_active = get_china_time()
 
-            balance = user.balance
-            total_earned = user.total_earned
-            total_spent = user.total_spent
-            created_at = user.created_at
+            balance = float(user.balance or 0)
+            total_earned = float(user.total_earned or 0)
+            total_spent = float(user.total_spent or 0)
+            created_at = user.created_at.strftime('%Y-%m-%d') if user.created_at else '未知'
 
         currency_name = self.plugin.config.currency.currency_name
         currency_icon = self.plugin.config.currency.currency_icon
 
+        holdings = []
+        if self.plugin.stock_market:
+            holdings = self.plugin.stock_market.get_holdings(group_id, user_id)
+
+        backpack = []
+        if self.plugin.goods_market:
+            backpack = self.plugin.goods_market.get_backpack(group_id, user_id)
+
+        result = plotter.render_account_html(
+            user_name=user_name,
+            balance=balance,
+            total_earned=total_earned,
+            total_spent=total_spent,
+            created_at=created_at,
+            currency_name=currency_name,
+            currency_icon=currency_icon,
+            holdings=holdings,
+            backpack=backpack,
+        )
+        if result:
+            html_content, data = result
+            image_path = await self._render_image(html_content, data)
+            if image_path:
+                yield event.image_result(image_path)
+                return
+
+        # 回退纯文本
         msg = f"""👤 {user_name} 的账户
 ━━━━━━━━━━━━━━
 {currency_icon} 余额: {balance:.2f}
 📈 累计获得: {total_earned:.2f}
 📉 累计消费: {total_spent:.2f}
-📅 开户时间: {created_at.strftime('%Y-%m-%d') if created_at else '未知'}"""
-
-        if self.plugin.stock_market:
-            holdings = self.plugin.stock_market.get_holdings(group_id, user_id)
-            if holdings:
-                msg += "\n\n📈 股票持仓:"
-                for h in holdings:
-                    profit_sign = "+" if h['profit'] >= 0 else ""
-                    msg += f"\n  {h['code']}: {h['amount']:.2f}股 市值{h['market_value']:.2f} ({profit_sign}{h['profit_pct']:.1f}%)"
-
-        if self.plugin.goods_market:
-            backpack = self.plugin.goods_market.get_backpack(group_id, user_id)
-            if backpack:
-                msg += "\n\n📦 物资背包:"
-                for b in backpack:
-                    msg += f"\n  {b['icon']} {b['name']}: {b['amount']:.2f} (市值{b['total_value']:.2f})"
-
+📅 开户时间: {created_at}"""
         yield event.plain_result(msg)
 
     async def handle_sign(self, event, group_id, user_id, user_name):

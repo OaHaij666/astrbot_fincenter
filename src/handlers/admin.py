@@ -307,15 +307,15 @@ class AdminHandler:
 
             rank_data = []
             for u in users:
-                wealth = u.balance
+                wealth = float(u.balance or 0)
                 if self.plugin.stock_market:
                     holdings = self.plugin.stock_market.get_holdings(group_id, u.user_id)
                     for h in holdings:
-                        wealth += h['market_value']
+                        wealth += float(h.get('market_value', 0))
                 if self.plugin.goods_market:
                     backpack = self.plugin.goods_market.get_backpack(group_id, u.user_id)
                     for b in backpack:
-                        wealth += b['total_value']
+                        wealth += float(b.get('total_value', 0))
                 rank_data.append({
                     'user_name': u.user_name or u.user_id,
                     'total_wealth': wealth,

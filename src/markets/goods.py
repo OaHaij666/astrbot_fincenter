@@ -328,20 +328,22 @@ class GoodsMarket:
                 definition = session.query(GoodsDefinition).filter_by(
                     group_id=group_id, goods_id=m.goods_id
                 ).first()
+                current_price = float(m.current_price)
+                previous_price = float(m.previous_price) if m.previous_price else 0
                 change = 0.0
-                if m.previous_price > 0:
-                    change = (m.current_price - m.previous_price) / m.previous_price * 100
+                if previous_price > 0:
+                    change = (current_price - previous_price) / previous_price * 100
                 result.append({
                     "goods_id": m.goods_id,
                     "name": definition.name if definition else m.goods_id,
                     "icon": definition.icon if definition else "📦",
                     "preview_image": definition.preview_image if definition else "",
-                    "current_price": m.current_price,
-                    "previous_price": m.previous_price,
-                    "base_price": definition.base_price if definition else 0,
+                    "current_price": current_price,
+                    "previous_price": previous_price,
+                    "base_price": float(definition.base_price) if definition else 0,
                     "change_pct": change,
-                    "min_price": definition.min_price if definition else 0,
-                    "max_price": definition.max_price if definition else 0,
+                    "min_price": float(definition.min_price) if definition else 0,
+                    "max_price": float(definition.max_price) if definition else 0,
                 })
         return result
 
@@ -359,14 +361,15 @@ class GoodsMarket:
                     definition = session.query(GoodsDefinition).filter_by(
                         group_id=group_id, goods_id=bp.goods_id
                     ).first()
-                    current_price = market.current_price if market else 0
+                    current_price = float(market.current_price) if market else 0
+                    amount = float(bp.amount)
                     result.append({
                         "goods_id": bp.goods_id,
                         "name": definition.name if definition else bp.goods_id,
                         "icon": definition.icon if definition else "📦",
-                        "amount": bp.amount,
+                        "amount": amount,
                         "current_price": current_price,
-                        "total_value": bp.amount * current_price,
+                        "total_value": amount * current_price,
                     })
         return result
 

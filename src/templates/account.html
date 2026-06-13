@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: fit-content;
+    min-width: 350px;
+    max-width: 600px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #eef3ff 0%, #fafcff 100%);
+    padding: 16px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(215, 232, 248, 0.75);
+    border-radius: 14px;
+    padding: 12px 20px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .title-bar h1 {
+    font-size: 24px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .card {
+    background: rgba(255,255,255,0.95);
+    border: 2px solid rgba(170,210,240,0.7);
+    border-radius: 14px;
+    box-shadow: 0 3px 10px rgba(190,210,235,0.15);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(200,220,240,0.4);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label {
+    color: #8aa9c4;
+    font-weight: 600;
+  }
+  .info-value {
+    color: #4a5b6e;
+    font-weight: 700;
+  }
+  .section-divider {
+    text-align: center;
+    color: #b8d4e8;
+    font-size: 12px;
+    margin: 10px 0 6px;
+    position: relative;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 35%;
+    height: 1px;
+    background: #b8d4e8;
+  }
+  .section-divider::before { left: 0; }
+  .section-divider::after { right: 0; }
+  .section-title {
+    font-size: 16px;
+    color: #5b8db8;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .holding-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 14px;
+  }
+  .holding-name { color: #4a5b6e; font-weight: 600; }
+  .holding-detail { color: #7a8fa5; }
+  .profit-up { color: #ff8a9c; }
+  .profit-down { color: #6fc1d9; }
+  .balance-highlight {
+    font-size: 28px;
+    color: #4a7fa8;
+    text-align: center;
+    font-weight: 700;
+    margin: 8px 0;
+  }
+  .balance-icon {
+    font-size: 20px;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>{{ user_name }} 的账户</h1>
+  </div>
+
+  <div class="card">
+    <div class="balance-highlight">
+      <span class="balance-icon">{{ currency_icon }}</span> {{ "%.2f"|format(balance) }}
+    </div>
+    <div class="info-row">
+      <span class="info-label">累计获得</span>
+      <span class="info-value">{{ currency_icon }}{{ "%.2f"|format(total_earned) }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">累计消费</span>
+      <span class="info-value">{{ currency_icon }}{{ "%.2f"|format(total_spent) }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">开户时间</span>
+      <span class="info-value">{{ created_at }}</span>
+    </div>
+  </div>
+
+  {% if holdings %}
+  <div class="card">
+    <div class="section-divider">✦</div>
+    <div class="section-title">📈 股票持仓</div>
+    {% for h in holdings %}
+    <div class="holding-row">
+      <span class="holding-name">{{ h.code }}</span>
+      <span class="holding-detail">{{ "%.2f"|format(h.amount) }}股 市值{{ "%.2f"|format(h.market_value) }}
+        <span class="{{ 'profit-up' if h.profit >= 0 else 'profit-down' }}">
+          {{ "+" if h.profit >= 0 else "" }}{{ "%.1f"|format(h.profit_pct) }}%
+        </span>
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if backpack %}
+  <div class="card">
+    <div class="section-divider">✦</div>
+    <div class="section-title">📦 物资背包</div>
+    {% for b in backpack %}
+    <div class="holding-row">
+      <span class="holding-name">{{ b.icon }} {{ b.name }}</span>
+      <span class="holding-detail">{{ "%.2f"|format(b.amount) }} (市值{{ "%.2f"|format(b.total_value) }})</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</body>
+</html>

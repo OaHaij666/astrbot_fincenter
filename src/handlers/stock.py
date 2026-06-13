@@ -60,8 +60,8 @@ class StockHandler:
 
         market_data = []
         for code, snap in snapshot.items():
-            price = snap["price"]
-            prev = prev_prices.get(code, price)
+            price = float(snap["price"])
+            prev = float(prev_prices.get(code, price))
             change = ((price - prev) / prev * 100) if prev > 0 else 0
             market_data.append({
                 'code': code,
