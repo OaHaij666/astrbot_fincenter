@@ -155,9 +155,10 @@ class StockHandler:
             image_path = await self._build_market_image(group_id, user_id)
             if image_path:
                 yield event.image_result(image_path)
-            else:
-                status = self.plugin.stock_market.get_market_status()
-                yield event.plain_result(status)
+                return
+            # 文字回退
+            status = self.plugin.stock_market.get_market_status()
+            yield event.plain_result(status)
 
         elif sub == "buy":
             if len(args) < 5:
@@ -187,6 +188,20 @@ class StockHandler:
                 yield event.plain_result("暂无持仓")
                 return
 
+            # 图片优先
+            result = plotter.render_stock_assets_html(
+                user_name, holdings,
+                self.plugin.config.currency.currency_name,
+                self.plugin.config.currency.currency_icon,
+            )
+            if result:
+                html_content, data = result
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    yield event.image_result(image_path)
+                    return
+
+            # 文字回退
             msg = f"📈 {user_name} 的股票持仓\n━━━━━━━━━━━━━━\n"
             total_value = 0
             total_profit = 0
@@ -220,8 +235,19 @@ class StockHandler:
             image_path = await self._build_kline_image(code, limit, group_id)
             if image_path:
                 yield event.image_result(image_path)
+                return
+            # 文字回退
+            with self.plugin.db.session_scope() as session:
+                history = session.query(StockHistory).filter_by(
+                    group_id=group_id, code=code
+                ).order_by(StockHistory.timestamp.desc()).limit(10).all()
+            if history:
+                lines = [f"📊 {code} 近期走势", "━━━━━━━━━━━━━━"]
+                for h in reversed(history):
+                    lines.append(f"{h.timestamp}: 开{h.open:.2f} 高{h.high:.2f} 低{h.low:.2f} 收{h.close:.2f}")
+                yield event.plain_result("\n".join(lines))
             else:
-                yield event.plain_result("绘图失败")
+                yield event.plain_result(f"暂无 {code} 的历史数据")
 
         elif sub == "news":
             news_list = self.plugin.stock_market.get_today_news(group_id)
@@ -229,6 +255,20 @@ class StockHandler:
                 yield event.plain_result("今日暂无市场新闻")
                 return
 
+            # 图片优先
+            result = plotter.render_stock_news_html(
+                news_list,
+                self.plugin.config.currency.currency_name,
+                self.plugin.config.currency.currency_icon,
+            )
+            if result:
+                html_content, data = result
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    yield event.image_result(image_path)
+                    return
+
+            # 文字回退
             now = get_china_time()
             msg = f"📰 今日市场快讯 ({now.strftime('%m-%d')})\n━━━━━━━━━━━━━━\n"
             for n in news_list:

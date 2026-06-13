@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: fit-content;
+    min-width: 350px;
+    max-width: 600px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #eef3ff 0%, #fafcff 100%);
+    padding: 16px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(215, 232, 248, 0.75);
+    border-radius: 14px;
+    padding: 12px 20px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .title-bar h1 {
+    font-size: 22px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .card {
+    background: rgba(255,255,255,0.95);
+    border: 2px solid rgba(170,210,240,0.7);
+    border-radius: 14px;
+    box-shadow: 0 3px 10px rgba(190,210,235,0.15);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .news-row {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(200,220,240,0.4);
+    font-size: 14px;
+  }
+  .news-row:last-child { border-bottom: none; }
+  .news-time {
+    color: #8aa9c4;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .news-icon {
+    font-size: 16px;
+  }
+  .news-content {
+    color: #4a5b6e;
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>📰 今日市场快讯</h1>
+  </div>
+
+  {% for n in news_list %}
+  <div class="card">
+    <div class="news-row">
+      <span class="news-time">{{ n.timestamp.strftime("%H:%M") if n.timestamp else "" }}</span>
+      <span class="news-icon">
+        {% if n.event_type == "major_positive" %}🚀
+        {% elif n.event_type == "positive" %}📈
+        {% elif n.event_type == "slight_positive" %}↗
+        {% elif n.event_type == "neutral" %}➡️
+        {% elif n.event_type == "slight_negative" %}↘
+        {% elif n.event_type == "negative" %}📉
+        {% elif n.event_type == "major_negative" %}💥
+        {% elif n.event_type == "volatility" %}⚠️
+        {% else %}📰{% endif %}
+      </span>
+      <div class="news-content">{{ n.content }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</body>
+</html>

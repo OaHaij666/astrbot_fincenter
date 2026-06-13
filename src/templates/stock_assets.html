@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: fit-content;
+    min-width: 350px;
+    max-width: 600px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #eef3ff 0%, #fafcff 100%);
+    padding: 16px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(215, 232, 248, 0.75);
+    border-radius: 14px;
+    padding: 12px 20px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .title-bar h1 {
+    font-size: 22px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .card {
+    background: rgba(255,255,255,0.95);
+    border: 2px solid rgba(170,210,240,0.7);
+    border-radius: 14px;
+    box-shadow: 0 3px 10px rgba(190,210,235,0.15);
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  .holding-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(200,220,240,0.4);
+  }
+  .holding-row:last-child { border-bottom: none; }
+  .holding-name { color: #4a5b6e; font-weight: 700; font-size: 15px; }
+  .holding-detail { color: #7a8fa5; text-align: right; }
+  .profit-up { color: #ff8a9c; font-weight: 600; }
+  .profit-down { color: #6fc1d9; font-weight: 600; }
+  .summary {
+    text-align: center;
+    font-size: 16px;
+    padding: 8px 0;
+  }
+  .summary-value { font-weight: 700; font-size: 20px; color: #4a7fa8; }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>📈 {{ user_name }} 的股票持仓</h1>
+  </div>
+
+  {% for h in holdings %}
+  <div class="card">
+    <div class="holding-row">
+      <span class="holding-name">{{ h.code }}</span>
+      <span class="holding-detail">{{ "%.2f"|format(h.amount) }}股</span>
+    </div>
+    <div class="holding-row">
+      <span>成本 {{ "%.2f"|format(h.avg_cost) }}</span>
+      <span>现价 {{ "%.2f"|format(h.current_price) }}</span>
+    </div>
+    <div class="holding-row">
+      <span>市值 {{ "%.2f"|format(h.market_value) }}</span>
+      <span class="{{ 'profit-up' if h.profit >= 0 else 'profit-down' }}">
+        {{ "+" if h.profit >= 0 else "" }}{{ "%.1f"|format(h.profit_pct) }}%
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="card">
+    <div class="summary">
+      总市值 <span class="summary-value">{{ currency_icon }}{{ "%.2f"|format(total_value) }}</span>
+      <br>
+      总盈亏 <span class="{{ 'profit-up' if total_profit >= 0 else 'profit-down' }}">
+        {{ "+" if total_profit >= 0 else "" }}{{ currency_icon }}{{ "%.2f"|format(total_profit) }}
+      </span>
+    </div>
+  </div>
+</body>
+</html>

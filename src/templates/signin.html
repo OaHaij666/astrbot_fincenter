@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: fit-content;
+    min-width: 300px;
+    max-width: 500px;
+    font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
+    background: linear-gradient(180deg, #eef3ff 0%, #fafcff 100%);
+    padding: 16px;
+    color: #4a5b6e;
+  }
+  .title-bar {
+    background: rgba(215, 232, 248, 0.75);
+    border-radius: 14px;
+    padding: 12px 20px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .title-bar h1 {
+    font-size: 22px;
+    color: #4a7fa8;
+    font-weight: 700;
+  }
+  .card {
+    background: rgba(255,255,255,0.95);
+    border: 2px solid rgba(170,210,240,0.7);
+    border-radius: 14px;
+    box-shadow: 0 3px 10px rgba(190,210,235,0.15);
+    padding: 16px 20px;
+    text-align: center;
+  }
+  .reward-main {
+    font-size: 32px;
+    color: #4a7fa8;
+    font-weight: 700;
+    margin: 10px 0;
+  }
+  .reward-icon {
+    font-size: 24px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(200,220,240,0.4);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: #8aa9c4; font-weight: 600; }
+  .info-value { color: #4a5b6e; font-weight: 700; }
+  .consecutive {
+    color: #ff8a9c;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <h1>✅ 签到成功</h1>
+  </div>
+
+  <div class="card">
+    <div class="reward-main">
+      <span class="reward-icon">{{ currency_icon }}</span> {{ "%.2f"|format(total_reward) }}
+    </div>
+    <div class="info-row">
+      <span class="info-label">基础奖励</span>
+      <span class="info-value">{{ currency_icon }}{{ "%.2f"|format(base_reward) }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">连续签到</span>
+      <span class="info-value consecutive">🔥 {{ consecutive_days }}天 (+{{ "%.2f"|format(bonus) }})</span>
+    </div>
+  </div>
+</body>
+</html>

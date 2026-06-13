@@ -285,6 +285,107 @@ def render_account_html(user_name, balance, total_earned, total_spent,
     return (html_content, {})
 
 
+def render_stock_assets_html(user_name, holdings, currency_name="金币", currency_icon="💰"):
+    """生成股票持仓 HTML
+
+    Args:
+        user_name: 用户名
+        holdings: 持仓列表
+        currency_name: 货币名称
+        currency_icon: 货币图标
+
+    Returns:
+        (html_content, data_dict) 元组
+    """
+    env = _get_jinja()
+    template = env.get_template('stock_assets.html')
+    total_value = sum(h.get('market_value', 0) for h in holdings)
+    total_profit = sum(h.get('profit', 0) for h in holdings)
+    html_content = template.render(
+        user_name=user_name,
+        holdings=holdings,
+        total_value=total_value,
+        total_profit=total_profit,
+        currency_name=currency_name,
+        currency_icon=currency_icon,
+    )
+    return (html_content, {})
+
+
+def render_stock_news_html(news_list, currency_name="金币", currency_icon="💰"):
+    """生成股市新闻 HTML
+
+    Args:
+        news_list: 新闻列表
+        currency_name: 货币名称
+        currency_icon: 货币图标
+
+    Returns:
+        (html_content, data_dict) 元组
+    """
+    env = _get_jinja()
+    template = env.get_template('stock_news.html')
+    html_content = template.render(
+        news_list=news_list,
+        currency_name=currency_name,
+        currency_icon=currency_icon,
+    )
+    return (html_content, {})
+
+
+def render_signin_html(total_reward, base_reward, consecutive_days, bonus,
+                       currency_name="金币", currency_icon="💰"):
+    """生成签到结果 HTML
+
+    Args:
+        total_reward: 总奖励
+        base_reward: 基础奖励
+        consecutive_days: 连续签到天数
+        bonus: 连续签到额外奖励
+        currency_name: 货币名称
+        currency_icon: 货币图标
+
+    Returns:
+        (html_content, data_dict) 元组
+    """
+    env = _get_jinja()
+    template = env.get_template('signin.html')
+    html_content = template.render(
+        total_reward=total_reward,
+        base_reward=base_reward,
+        consecutive_days=consecutive_days,
+        bonus=bonus,
+        currency_name=currency_name,
+        currency_icon=currency_icon,
+    )
+    return (html_content, {})
+
+
+def render_goods_backpack_html(user_name, backpack, currency_name="金币", currency_icon="💰"):
+    """生成物资背包 HTML
+
+    Args:
+        user_name: 用户名
+        backpack: 背包列表
+        currency_name: 货币名称
+        currency_icon: 货币图标
+
+    Returns:
+        (html_content, data_dict) 元组
+    """
+    env = _get_jinja()
+    template = env.get_template('goods_backpack.html')
+    total_value = sum(b.get('total_value', 0) for b in backpack)
+    html_content = template.render(
+        user_name=user_name,
+        backpack=backpack,
+        total_value=total_value,
+        currency_name=currency_name,
+        currency_icon=currency_icon,
+    )
+    return (html_content, {})
+
+
 async def shutdown():
     """清理资源（兼容旧接口，现在无需手动关闭浏览器）"""
     pass

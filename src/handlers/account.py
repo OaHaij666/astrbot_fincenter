@@ -225,6 +225,23 @@ class AccountHandler:
         currency_name = self.plugin.config.currency.currency_name
         currency_icon = self.plugin.config.currency.currency_icon
 
+        # 图片优先
+        result = plotter.render_signin_html(
+            total_reward=total_reward,
+            base_reward=reward,
+            consecutive_days=consecutive_days,
+            bonus=bonus,
+            currency_name=currency_name,
+            currency_icon=currency_icon,
+        )
+        if result:
+            html_content, data = result
+            image_path = await self._render_image(html_content, data)
+            if image_path:
+                yield event.image_result(image_path)
+                return
+
+        # 文字回退
         msg = f"""✅ 签到成功！
 {currency_icon} 基础奖励: {reward:.2f}
 🔥 连续签到: {consecutive_days}天 (额外 +{bonus:.2f})

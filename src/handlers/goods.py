@@ -86,10 +86,15 @@ class GoodsHandler:
                 image_path = await self._render_image(html_content, data)
                 if image_path:
                     yield event.image_result(image_path)
-                else:
-                    yield event.plain_result("图片生成失败")
-            else:
-                yield event.plain_result("图片生成失败")
+                    return
+
+            # 文字回退
+            currency_icon = self.plugin.config.currency.currency_icon
+            lines = ["📦 物资市场", "━━━━━━━━━━━━━━"]
+            for g in goods_list:
+                change_sign = "+" if g['change_pct'] >= 0 else ""
+                lines.append(f"{g['icon']} {g['name']}: {currency_icon}{g['current_price']:.2f} ({change_sign}{g['change_pct']:.1f}%)")
+            yield event.plain_result("\n".join(lines))
 
         elif sub == "buy":
             if len(args) < 5:
@@ -113,12 +118,27 @@ class GoodsHandler:
                 yield event.plain_result("背包空空如也")
                 return
 
+            # 图片优先
+            result = plotter.render_goods_backpack_html(
+                user_name, backpack,
+                self.plugin.config.currency.currency_name,
+                self.plugin.config.currency.currency_icon,
+            )
+            if result:
+                html_content, data = result
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    yield event.image_result(image_path)
+                    return
+
+            # 文字回退
+            currency_icon = self.plugin.config.currency.currency_icon
             msg = f"🎒 {user_name} 的物资背包\n━━━━━━━━━━━━━━\n"
             total_value = 0
             for b in backpack:
                 msg += f"{b['icon']} {b['name']}: {b['amount']:.2f} (单价{b['current_price']:.2f}, 市值{b['total_value']:.2f})\n"
                 total_value += b['total_value']
-            msg += f"\n📦 总市值: {total_value:.2f}"
+            msg += f"\n📦 总市值: {currency_icon}{total_value:.2f}"
             yield event.plain_result(msg)
 
         else:

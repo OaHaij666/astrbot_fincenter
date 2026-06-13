@@ -334,10 +334,15 @@ class AdminHandler:
             image_path = await self._render_image(html_content, data)
             if image_path:
                 yield event.image_result(image_path)
-            else:
-                yield event.plain_result("排行榜图片生成失败")
-        else:
-            yield event.plain_result("排行榜图片生成失败")
+                return
+
+        # 文字回退
+        currency_icon = self.plugin.config.currency.currency_icon
+        lines = [f"🏆 财富排行榜 TOP{len(rank_data)}", "━━━━━━━━━━━━━━"]
+        for i, r in enumerate(rank_data[:20], 1):
+            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"{i}.")
+            lines.append(f"{medal} {r['user_name']}: {currency_icon}{r['total_wealth']:.2f}")
+        yield event.plain_result("\n".join(lines))
 
     def _get_admin_help_text(self):
         lines = [
