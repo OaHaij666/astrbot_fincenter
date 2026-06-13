@@ -1,10 +1,10 @@
 """物资市场处理器
 
 处理物资市场查看、买卖、背包查看等指令。
-图片渲染对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
+图片渲染对齐参考项目: html_render → 文件路径 → OneBot API 直接发送
 """
-import base64
 import os
+import tempfile
 
 from astrbot.api import logger
 from ..utils import plotter
@@ -16,39 +16,33 @@ class GoodsHandler:
         self.html_render = html_render
 
     async def _render_image(self, html_content, data=None, options=None):
-        """调用框架 html_render 渲染 HTML 为图片，返回可用于 event.image_result() 的 URL
-
-        对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
-        return_url=False 时返回 bytes 或 str(文件路径)
-        bytes → base64:// URL, str → 直接作为 URL
-        """
+        """调用框架 html_render 渲染 HTML 为图片，返回文件路径或 None"""
         try:
             image_data = await self.html_render(
                 html_content,
                 data or {},
-                False,  # return_url=False，直接获取图片数据
+                False,
                 options or {"type": "png"},
             )
             if not image_data:
                 return None
-
-            if isinstance(image_data, bytes):
-                b64 = base64.b64encode(image_data).decode("utf-8")
-                return f"base64://{b64}"
-            elif isinstance(image_data, str):
-                # str 可能是文件路径，读取后转 base64（对齐参考项目）
-                if os.path.isfile(image_data):
-                    with open(image_data, "rb") as f:
-                        file_data = f.read()
-                    b64 = base64.b64encode(file_data).decode("utf-8")
-                    return f"base64://{b64}"
+            if isinstance(image_data, str):
                 return image_data
+            elif isinstance(image_data, bytes):
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=self.plugin.cache_dir)
+                tmp.write(image_data)
+                tmp.close()
+                return tmp.name
             else:
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
                 return None
         except Exception as e:
             logger.error(f"html_render failed: {e}")
             return None
+
+    async def _send_image(self, event, image_path):
+        """通过 OneBot API 发送图片"""
+        return await self.plugin._send_image_via_onebot(event, image_path)
 
     async def handle(self, event, args, group_id, user_id, user_name):
         if not self.plugin.goods_market:
@@ -72,10 +66,11 @@ class GoodsHandler:
             )
             if result:
                 html_content, data = result
-                url = await self._render_image(html_content, data)
-                if url:
-                    yield event.image_result(url)
-                    return
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    sent = await self._send_image(event, image_path)
+                    if sent:
+                        return
             yield event.plain_result(self._get_goods_help_text())
             return
 
@@ -93,9 +88,9 @@ class GoodsHandler:
             )
             if result:
                 html_content, data = result
-                url = await self._render_image(html_content, data)
-                if url:
-                    yield event.image_result(url)
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    await self._send_image(event, image_path)
                 else:
                     yield event.plain_result("图片生成失败")
             else:

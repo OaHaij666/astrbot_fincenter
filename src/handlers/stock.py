@@ -1,12 +1,11 @@
 """股市处理器
 
 处理股市查看、买卖、K线图、新闻等指令。
-ORM 对象通过 to_kline_dict() / to_display_dict() 转换为字典后传递给绘图和展示层。
-图片渲染对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
+图片渲染对齐参考项目: html_render → 文件路径 → OneBot API 直接发送
 """
 import asyncio
-import base64
 import os
+import tempfile
 
 from astrbot.api import logger
 from ..core.database import StockHistory, get_china_time
@@ -19,39 +18,33 @@ class StockHandler:
         self.html_render = html_render
 
     async def _render_image(self, html_content, data=None, options=None):
-        """调用框架 html_render 渲染 HTML 为图片，返回可用于 event.image_result() 的 URL
-
-        对齐参考项目: html_render(html_content, data_dict, return_url=False, options)
-        return_url=False 时返回 bytes 或 str(文件路径)
-        bytes → base64:// URL, str → 直接作为 URL
-        """
+        """调用框架 html_render 渲染 HTML 为图片，返回文件路径或 None"""
         try:
             image_data = await self.html_render(
                 html_content,
                 data or {},
-                False,  # return_url=False，直接获取图片数据
+                False,
                 options or {"type": "png"},
             )
             if not image_data:
                 return None
-
-            if isinstance(image_data, bytes):
-                b64 = base64.b64encode(image_data).decode("utf-8")
-                return f"base64://{b64}"
-            elif isinstance(image_data, str):
-                # str 可能是文件路径，读取后转 base64（对齐参考项目）
-                if os.path.isfile(image_data):
-                    with open(image_data, "rb") as f:
-                        file_data = f.read()
-                    b64 = base64.b64encode(file_data).decode("utf-8")
-                    return f"base64://{b64}"
+            if isinstance(image_data, str):
                 return image_data
+            elif isinstance(image_data, bytes):
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=self.plugin.cache_dir)
+                tmp.write(image_data)
+                tmp.close()
+                return tmp.name
             else:
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
                 return None
         except Exception as e:
             logger.error(f"html_render failed: {e}")
             return None
+
+    async def _send_image(self, event, image_path):
+        """通过 OneBot API 发送图片"""
+        return await self.plugin._send_image_via_onebot(event, image_path)
 
     async def _build_market_image(self, group_id, user_id):
         if not self.plugin.stock_market:
@@ -153,19 +146,20 @@ class StockHandler:
             )
             if result:
                 html_content, data = result
-                url = await self._render_image(html_content, data)
-                if url:
-                    yield event.image_result(url)
-                    return
+                image_path = await self._render_image(html_content, data)
+                if image_path:
+                    sent = await self._send_image(event, image_path)
+                    if sent:
+                        return
             yield event.plain_result(self._get_stock_help_text())
             return
 
         sub = args[2]
 
         if sub == "market":
-            url = await self._build_market_image(group_id, user_id)
-            if url:
-                yield event.image_result(url)
+            image_path = await self._build_market_image(group_id, user_id)
+            if image_path:
+                await self._send_image(event, image_path)
             else:
                 status = self.plugin.stock_market.get_market_status()
                 yield event.plain_result(status)
@@ -228,9 +222,9 @@ class StockHandler:
                 except ValueError:
                     pass
 
-            url = await self._build_kline_image(code, limit, group_id)
-            if url:
-                yield event.image_result(url)
+            image_path = await self._build_kline_image(code, limit, group_id)
+            if image_path:
+                await self._send_image(event, image_path)
             else:
                 yield event.plain_result("绘图失败")
 
