@@ -5,7 +5,6 @@
 """
 import asyncio
 import os
-import tempfile
 
 from astrbot.api import logger
 from ..core.database import StockHistory, get_china_time
@@ -15,32 +14,6 @@ from ..utils import plotter
 class StockHandler:
     def __init__(self, plugin, html_render):
         self.plugin = plugin
-        self.html_render = html_render
-
-    async def _render_image(self, html_content, data=None, options=None):
-        """调用框架 html_render 渲染 HTML 为图片，返回文件路径或 None"""
-        try:
-            image_data = await self.html_render(
-                html_content,
-                data or {},
-                False,
-                options or {"type": "png"},
-            )
-            if not image_data:
-                return None
-            if isinstance(image_data, str):
-                return image_data
-            elif isinstance(image_data, bytes):
-                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=self.plugin.cache_dir)
-                tmp.write(image_data)
-                tmp.close()
-                return tmp.name
-            else:
-                logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
-                return None
-        except Exception as e:
-            logger.error(f"html_render failed: {e}")
-            return None
 
     async def _build_market_image(self, group_id, user_id):
         if not self.plugin.stock_market:
@@ -90,7 +63,7 @@ class StockHandler:
             return None
 
         html_content, data = result
-        url = await self._render_image(html_content, data)
+        url = await self.plugin._render_image(html_content, data)
         return url
 
     async def _build_kline_image(self, code, limit, group_id):
@@ -114,7 +87,7 @@ class StockHandler:
             return None
 
         html_content, data = result
-        url = await self._render_image(html_content, data)
+        url = await self.plugin._render_image(html_content, data)
         return url
 
     async def handle(self, event, args, group_id, user_id, user_name):
@@ -142,7 +115,7 @@ class StockHandler:
             )
             if result:
                 html_content, data = result
-                image_path = await self._render_image(html_content, data)
+                image_path = await self.plugin._render_image(html_content, data)
                 if image_path:
                     yield event.image_result(image_path)
                     return
@@ -196,7 +169,7 @@ class StockHandler:
             )
             if result:
                 html_content, data = result
-                image_path = await self._render_image(html_content, data)
+                image_path = await self.plugin._render_image(html_content, data)
                 if image_path:
                     yield event.image_result(image_path)
                     return
@@ -263,7 +236,7 @@ class StockHandler:
             )
             if result:
                 html_content, data = result
-                image_path = await self._render_image(html_content, data)
+                image_path = await self.plugin._render_image(html_content, data)
                 if image_path:
                     yield event.image_result(image_path)
                     return
