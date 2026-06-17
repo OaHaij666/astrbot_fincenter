@@ -24,7 +24,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from src.config import FinCenterConfig
-from src.core.database import DB, ChatRewardState, UserAccount, PaidCommand, get_china_time
+from src.core.database import DB, ChatRewardState, UserAccount, PaidCommand, MarketGroupBinding, get_china_time
 from src.markets.stock import StockMarket
 from src.markets.goods import GoodsMarket
 from src.handlers import AccountHandler, StockHandler, GoodsHandler, AdminHandler
@@ -46,15 +46,17 @@ class FinCenterPlugin(Star):
 
     # ── 辅助方法 ──────────────────────────────────────────────
 
-    def _extract_group_id(self, event: AstrMessageEvent) -> str:
-        """从 unified_msg_origin 提取群号，私聊场景回退到 user_id"""
+    def _extract_raw_group_id(self, event: AstrMessageEvent) -> str:
+        """从 unified_msg_origin 提取真实群号，私聊场景回退到 user_id。"""
         origin = getattr(event, "unified_msg_origin", "") or ""
         parts = origin.split(":")
         if len(parts) >= 3 and "Group" in parts[1]:
-            group_id = parts[2]
-        else:
-            group_id = str(event.get_sender_id())
-        return self._resolve_group_id(group_id)
+            return parts[2]
+        return str(event.get_sender_id())
+
+    def _extract_group_id(self, event: AstrMessageEvent) -> str:
+        """提取账户域 group_id；cross_group_data 只影响金钱/账户数据。"""
+        return self._resolve_group_id(self._extract_raw_group_id(event))
 
     def _get_user_name(self, event: AstrMessageEvent) -> str:
         """从 event 获取发送者昵称"""
@@ -99,26 +101,118 @@ class FinCenterPlugin(Star):
         self.goods_market = None
 
         if self.config.stock.stock_enabled:
-            self.stock_market = StockMarket(
-                self.db,
-                stock_config=self.config.stock,
-                news_config=self.config.stock_news,
-            )
-            self.stock_market.start()
-            logger.info("Stock market started")
+            self.enable_stock_market(update_config=False)
 
         if self.config.goods.goods_enabled:
-            self.goods_market = GoodsMarket(
-                self.db,
-                config=self.config.goods,
-            )
-            self.goods_market.start()
-            logger.info("Goods market started")
+            self.enable_goods_market(update_config=False)
+
+    def _set_raw_config_value(self, section: str, key: str, value):
+        section_data = self._raw_config.setdefault(section, {})
+        if isinstance(section_data, dict):
+            section_data[key] = value
+
+    def enable_stock_market(self, update_config: bool = True):
+        if self.stock_market:
+            return False, "股市模块已启用"
+        if update_config:
+            self.config.stock.stock_enabled = True
+            self._set_raw_config_value("stock", "stock_enabled", True)
+        self.stock_market = StockMarket(
+            self.db,
+            stock_config=self.config.stock,
+            news_config=self.config.stock_news,
+        )
+        self.stock_market.start()
+        logger.info("Stock market started")
+        return True, "✅ 股市模块已启用"
+
+    def disable_stock_market(self, update_config: bool = True):
+        if not self.stock_market:
+            if update_config:
+                self.config.stock.stock_enabled = False
+                self._set_raw_config_value("stock", "stock_enabled", False)
+            return False, "股市模块已禁用"
+        self.stock_market.stop()
+        self.stock_market = None
+        if update_config:
+            self.config.stock.stock_enabled = False
+            self._set_raw_config_value("stock", "stock_enabled", False)
+        logger.info("Stock market stopped")
+        return True, "✅ 股市模块已禁用"
+
+    def enable_goods_market(self, update_config: bool = True):
+        if self.goods_market:
+            return False, "物资模块已启用"
+        if update_config:
+            self.config.goods.goods_enabled = True
+            self._set_raw_config_value("goods", "goods_enabled", True)
+        self.goods_market = GoodsMarket(
+            self.db,
+            config=self.config.goods,
+        )
+        self.goods_market.start()
+        logger.info("Goods market started")
+        return True, "✅ 物资模块已启用"
+
+    def disable_goods_market(self, update_config: bool = True):
+        if not self.goods_market:
+            if update_config:
+                self.config.goods.goods_enabled = False
+                self._set_raw_config_value("goods", "goods_enabled", False)
+            return False, "物资模块已禁用"
+        self.goods_market.stop()
+        self.goods_market = None
+        if update_config:
+            self.config.goods.goods_enabled = False
+            self._set_raw_config_value("goods", "goods_enabled", False)
+        logger.info("Goods market stopped")
+        return True, "✅ 物资模块已禁用"
 
     def _resolve_group_id(self, group_id: str) -> str:
         if self.config.basic.cross_group_data:
             return "__global__"
         return group_id
+
+    def _get_market_binding(self, physical_group_id: str, module: str) -> tuple[bool, str]:
+        """返回本物理群在指定模块上的启用状态和市场分组 ID。"""
+        default_group = str(physical_group_id)
+        with self.db.session_scope() as session:
+            binding = session.query(MarketGroupBinding).filter_by(
+                physical_group_id=default_group,
+                module=module,
+            ).first()
+            if not binding:
+                return True, default_group
+            return bool(binding.enabled), binding.market_group_id or default_group
+
+    def get_stock_binding(self, physical_group_id: str) -> tuple[bool, str]:
+        return self._get_market_binding(physical_group_id, "stock")
+
+    def get_goods_binding(self, physical_group_id: str) -> tuple[bool, str]:
+        return self._get_market_binding(physical_group_id, "goods")
+
+    def set_market_binding(self, physical_group_id: str, module: str, market_group_id: str = None, enabled: bool = True):
+        market_group_id = (market_group_id or physical_group_id or "").strip()
+        physical_group_id = str(physical_group_id)
+        with self.db.session_scope() as session:
+            binding = session.query(MarketGroupBinding).filter_by(
+                physical_group_id=physical_group_id,
+                module=module,
+            ).first()
+            if not binding:
+                binding = MarketGroupBinding(
+                    physical_group_id=physical_group_id,
+                    module=module,
+                    market_group_id=market_group_id,
+                    enabled=1 if enabled else 0,
+                    updated_at=get_china_time(),
+                )
+                session.add(binding)
+            else:
+                binding.market_group_id = market_group_id
+                binding.enabled = 1 if enabled else 0
+                binding.updated_at = get_china_time()
+        return enabled, market_group_id
 
     def _check_group_allowed(self, group_id: str) -> bool:
         cfg = self.config.basic
@@ -195,14 +289,28 @@ class FinCenterPlugin(Star):
             except Exception as e:
                 logger.debug(f"ECharts 等待超时或非 ECharts 页面: {e}")
 
-            # 获取内容实际尺寸，精确裁剪到内容边界
-            body_size = await page.evaluate("""() => {
+            # 获取内容实际尺寸，精确裁剪到 body/子元素的真实边界。
+            # 不使用 documentElement 的 scroll/offset 尺寸：它至少等于 viewport，
+            # 会把 1200x2000（或远端默认 1280x720）的空白区域一起截进去。
+            content_box = await page.evaluate("""() => {
                 const body = document.body;
-                const html = document.documentElement;
-                // 使用 scrollWidth/scrollHeight 获取完整内容尺寸
-                const width = Math.max(body.scrollWidth, body.offsetWidth, html.scrollWidth, html.offsetWidth);
-                const height = Math.max(body.scrollHeight, body.offsetHeight, html.scrollHeight, html.offsetHeight);
-                return { width, height };
+                const bodyRect = body.getBoundingClientRect();
+                let right = bodyRect.right;
+                let bottom = bodyRect.bottom;
+
+                for (const el of body.querySelectorAll('*')) {
+                    const rect = el.getBoundingClientRect();
+                    if (!rect.width && !rect.height) continue;
+                    right = Math.max(right, rect.right);
+                    bottom = Math.max(bottom, rect.bottom);
+                }
+
+                return {
+                    x: 0,
+                    y: 0,
+                    width: Math.max(1, Math.ceil(right)),
+                    height: Math.max(1, Math.ceil(bottom)),
+                };
             }""")
 
             # 截图选项 - 用 clip 精确裁剪，避免右侧空白
@@ -210,10 +318,10 @@ class FinCenterPlugin(Star):
             screenshot_opts = {
                 "type": opts.get("type", "png"),
                 "clip": {
-                    "x": 0,
-                    "y": 0,
-                    "width": body_size["width"],
-                    "height": body_size["height"],
+                    "x": content_box["x"],
+                    "y": content_box["y"],
+                    "width": content_box["width"],
+                    "height": content_box["height"],
                 },
             }
             if opts.get("quality"):
@@ -355,7 +463,7 @@ class FinCenterPlugin(Star):
             if not paid_cmd:
                 return None
 
-            is_admin = str(user_id) in self.config.basic.admin_ids
+            is_admin = str(user_id) in self.config.admin_id_set
             if is_admin and cfg.paid_cmd_ignore_admin:
                 return None
 
@@ -395,7 +503,10 @@ class FinCenterPlugin(Star):
     @filter.command("fc", alias={"财富中心", "fincenter"})
     async def fc(self, event: AstrMessageEvent):
         """财富中心 - 开户/签到/股市/物资/管理"""
-        group_id = self._extract_group_id(event)
+        raw_group_id = self._extract_raw_group_id(event)
+        group_id = self._resolve_group_id(raw_group_id)
+        stock_enabled, stock_group_id = self.get_stock_binding(raw_group_id)
+        goods_enabled, goods_group_id = self.get_goods_binding(raw_group_id)
         user_id = str(event.get_sender_id())
         user_name = self._get_user_name(event)
         args = self._parse_args(event)
@@ -455,7 +566,7 @@ class FinCenterPlugin(Star):
             async for result in self.account_handler.handle_open(event, args, group_id, user_id, user_name):
                 yield result
         elif module == "me":
-            async for result in self.account_handler.handle_me(event, group_id, user_id, user_name):
+            async for result in self.account_handler.handle_me(event, group_id, user_id, user_name, stock_group_id, goods_group_id, stock_enabled, goods_enabled):
                 yield result
         elif module == "sign":
             async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name):
@@ -464,22 +575,22 @@ class FinCenterPlugin(Star):
             async for result in self.account_handler.handle_transfer(event, args, group_id, user_id, user_name):
                 yield result
         elif module == "rank":
-            async for result in self.admin_handler.handle_rank(event, args, group_id, user_id, user_name):
+            async for result in self.admin_handler.handle_rank(event, args, raw_group_id, group_id, user_id, user_name):
                 yield result
 
         # ── 股市指令 ──
         elif module == "stock":
-            async for result in self.stock_handler.handle(event, args, group_id, user_id, user_name):
+            async for result in self.stock_handler.handle(event, args, stock_group_id, group_id, user_id, user_name, stock_enabled):
                 yield result
 
         # ── 物资指令 ──
         elif module == "goods":
-            async for result in self.goods_handler.handle(event, args, group_id, user_id, user_name):
+            async for result in self.goods_handler.handle(event, args, goods_group_id, group_id, user_id, user_name, goods_enabled):
                 yield result
 
         # ── 管理员指令 ──
         elif module == "admin":
-            async for result in self.admin_handler.handle(event, args, group_id, user_id, user_name):
+            async for result in self.admin_handler.handle(event, args, raw_group_id, group_id, user_id, user_name):
                 yield result
 
         else:
@@ -490,11 +601,12 @@ class FinCenterPlugin(Star):
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
         """群消息事件：处理聊天奖励和付费指令"""
-        group_id = self._extract_group_id(event)
+        raw_group_id = self._extract_raw_group_id(event)
+        group_id = self._resolve_group_id(raw_group_id)
         user_id = str(event.get_sender_id())
         user_name = self._get_user_name(event)
 
-        if not self._check_group_allowed(group_id):
+        if not self._check_group_allowed(raw_group_id):
             return
 
         # 聊天奖励

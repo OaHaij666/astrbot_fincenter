@@ -4,9 +4,6 @@
 排行榜已移至普通用户指令，此处仅保留管理员入口。
 图片渲染对齐参考项目: html_render → 文件路径 → event.image_result(文件路径)
 """
-import os
-
-from astrbot.api import logger
 from ..core.database import UserAccount, GoodsDefinition, GoodsMarketPrice
 from ..utils import plotter
 
@@ -15,8 +12,8 @@ class AdminHandler:
     def __init__(self, plugin, html_render):
         self.plugin = plugin
 
-    async def handle(self, event, args, group_id, user_id, user_name):
-        if str(user_id) not in self.plugin.config.basic.admin_ids:
+    async def handle(self, event, args, raw_group_id, group_id, user_id, user_name):
+        if str(user_id) not in self.plugin.config.admin_id_set:
             yield event.plain_result("仅限管理员使用")
             return
 
@@ -36,6 +33,9 @@ class AdminHandler:
                     {
                         'section_name': '📈 股市控制',
                         'commands': [
+                            {'cmd': '/fc admin stock enable [分组ID]', 'desc': '本群启用股市/绑定分组'},
+                            {'cmd': '/fc admin stock disable', 'desc': '本群禁用股市'},
+                            {'cmd': '/fc admin stock group [分组ID]', 'desc': '查看/切换股市分组'},
                             {'cmd': '/fc admin stock open', 'desc': '强制开市'},
                             {'cmd': '/fc admin stock close', 'desc': '强制休市'},
                             {'cmd': '/fc admin stock auto', 'desc': '恢复自动模式'},
@@ -44,6 +44,9 @@ class AdminHandler:
                     {
                         'section_name': '📦 物资管理',
                         'commands': [
+                            {'cmd': '/fc admin goods enable [分组ID]', 'desc': '本群启用物资/绑定分组'},
+                            {'cmd': '/fc admin goods disable', 'desc': '本群禁用物资'},
+                            {'cmd': '/fc admin goods group [分组ID]', 'desc': '查看/切换物资分组'},
                             {'cmd': '/fc admin goods add <ID> <名称> <价>', 'desc': '添加物资'},
                             {'cmd': '/fc admin goods remove <物资ID>', 'desc': '移除物资'},
                             {'cmd': '/fc admin goods setprice <ID> <价>', 'desc': '设置价格'},
@@ -65,6 +68,8 @@ class AdminHandler:
 
         sub = args[2]
         currency_name = self.plugin.config.currency.currency_name
+        stock_enabled, stock_group_id = self.plugin.get_stock_binding(raw_group_id)
+        goods_enabled, goods_group_id = self.plugin.get_goods_binding(raw_group_id)
 
         if sub == "balance":
             if len(args) < 5:
@@ -136,29 +141,67 @@ class AdminHandler:
             yield event.plain_result(f"✅ 已将 {target_id} 的余额设为 {amount:.2f}")
 
         elif sub == "stock":
-            if not self.plugin.stock_market:
-                yield event.plain_result("股市模块未启用")
-                return
-
             action = args[3] if len(args) >= 4 else None
-            if action == "open":
-                self.plugin.stock_market.set_open(True)
-                yield event.plain_result("✅ 股市已强制开市")
-            elif action == "close":
-                self.plugin.stock_market.set_open(False)
-                yield event.plain_result("✅ 股市已强制休市")
-            elif action == "auto":
-                self.plugin.stock_market.manual_override = None
-                yield event.plain_result("✅ 股市已恢复自动模式")
+            if action in ("enable", "on"):
+                target_group = args[4] if len(args) >= 5 else raw_group_id
+                self.plugin.set_market_binding(raw_group_id, "stock", target_group, True)
+                if not self.plugin.stock_market and self.plugin.config.stock.stock_enabled:
+                    self.plugin.enable_stock_market(update_config=False)
+                yield event.plain_result(f"✅ 本群股市已启用，绑定分组: {target_group}")
+            elif action in ("disable", "off"):
+                self.plugin.set_market_binding(raw_group_id, "stock", stock_group_id, False)
+                yield event.plain_result(f"✅ 本群股市已禁用（原分组: {stock_group_id}）")
+            elif action == "group":
+                if len(args) >= 5:
+                    target_group = args[4]
+                    self.plugin.set_market_binding(raw_group_id, "stock", target_group, True)
+                    yield event.plain_result(f"✅ 本群股市已切换到分组: {target_group}")
+                else:
+                    status = "启用" if stock_enabled else "禁用"
+                    yield event.plain_result(f"本群股市状态: {status}\n当前股市分组: {stock_group_id}")
+            elif action in ("open", "close", "auto"):
+                if not self.plugin.stock_market:
+                    yield event.plain_result("股市模块未启用")
+                    return
+                self.plugin.stock_market.ensure_group_initialized(stock_group_id)
+                if action == "open":
+                    self.plugin.stock_market.set_open(True)
+                    yield event.plain_result(f"✅ 股市分组 {stock_group_id} 已强制开市")
+                elif action == "close":
+                    self.plugin.stock_market.set_open(False)
+                    yield event.plain_result(f"✅ 股市分组 {stock_group_id} 已强制休市")
+                else:
+                    self.plugin.stock_market.manual_override = None
+                    yield event.plain_result(f"✅ 股市分组 {stock_group_id} 已恢复自动模式")
             else:
-                yield event.plain_result("格式: /fc admin stock <open|close|auto>")
+                yield event.plain_result("格式: /fc admin stock <enable [分组ID]|disable|group [分组ID]|open|close|auto>")
 
         elif sub == "goods":
+            action = args[3] if len(args) >= 4 else None
+            if action in ("enable", "on"):
+                target_group = args[4] if len(args) >= 5 else raw_group_id
+                self.plugin.set_market_binding(raw_group_id, "goods", target_group, True)
+                if not self.plugin.goods_market and self.plugin.config.goods.goods_enabled:
+                    self.plugin.enable_goods_market(update_config=False)
+                yield event.plain_result(f"✅ 本群物资模块已启用，绑定分组: {target_group}")
+                return
+            if action in ("disable", "off"):
+                self.plugin.set_market_binding(raw_group_id, "goods", goods_group_id, False)
+                yield event.plain_result(f"✅ 本群物资模块已禁用（原分组: {goods_group_id}）")
+                return
+            if action == "group":
+                if len(args) >= 5:
+                    target_group = args[4]
+                    self.plugin.set_market_binding(raw_group_id, "goods", target_group, True)
+                    yield event.plain_result(f"✅ 本群物资模块已切换到分组: {target_group}")
+                else:
+                    status = "启用" if goods_enabled else "禁用"
+                    yield event.plain_result(f"本群物资状态: {status}\n当前物资分组: {goods_group_id}")
+                return
+
             if not self.plugin.goods_market:
                 yield event.plain_result("物资市场模块未启用")
                 return
-
-            action = args[3] if len(args) >= 4 else None
             if action == "add":
                 # /fc admin goods add <物资ID> <名称> <基准价> [图标] [最低价] [最高价] [波动率]
                 if len(args) < 7:
@@ -180,7 +223,7 @@ class AdminHandler:
                 volatility = float(args[10]) if len(args) >= 11 else self.plugin.config.goods.goods_price_volatility
 
                 result = self.plugin.goods_market.add_goods(
-                    group_id, goods_id, name, icon, base_price, min_price, max_price, volatility
+                    goods_group_id, goods_id, name, icon, base_price, min_price, max_price, volatility
                 )
                 if result:
                     yield event.plain_result(f"✅ 物资 {name}({goods_id}) 添加成功，基准价 {base_price:.2f}")
@@ -193,7 +236,7 @@ class AdminHandler:
                     yield event.plain_result("格式: /fc admin goods remove <物资ID>")
                     return
                 goods_id = args[4]
-                result = self.plugin.goods_market.remove_goods(group_id, goods_id)
+                result = self.plugin.goods_market.remove_goods(goods_group_id, goods_id)
                 if result:
                     yield event.plain_result(f"✅ 物资 {goods_id} 已移除")
                 else:
@@ -210,7 +253,7 @@ class AdminHandler:
                 except ValueError:
                     yield event.plain_result("价格格式错误")
                     return
-                result = self.plugin.goods_market.set_goods_price(group_id, goods_id, price)
+                result = self.plugin.goods_market.set_goods_price(goods_group_id, goods_id, price)
                 if result:
                     yield event.plain_result(f"✅ 物资 {goods_id} 价格已设为 {price:.2f}")
                 else:
@@ -229,7 +272,7 @@ class AdminHandler:
                     return
                 with self.plugin.db.session_scope() as session:
                     definition = session.query(GoodsDefinition).filter_by(
-                        group_id=group_id, goods_id=goods_id
+                        group_id=goods_group_id, goods_id=goods_id
                     ).first()
                     if not definition:
                         yield event.plain_result(f"❌ 物资 {goods_id} 不存在")
@@ -241,14 +284,14 @@ class AdminHandler:
                 # 重置所有物资价格至基准价
                 with self.plugin.db.session_scope() as session:
                     definitions = session.query(GoodsDefinition).filter_by(
-                        group_id=group_id
+                        group_id=goods_group_id
                     ).all()
                     if not definitions:
                         yield event.plain_result("当前群无物资定义")
                         return
                     for d in definitions:
                         market_entry = session.query(GoodsMarketPrice).filter_by(
-                            group_id=group_id, goods_id=d.goods_id
+                            group_id=goods_group_id, goods_id=d.goods_id
                         ).first()
                         if market_entry:
                             market_entry.current_price = d.base_price
@@ -263,7 +306,7 @@ class AdminHandler:
         else:
             yield event.plain_result("未知管理指令")
 
-    async def handle_rank(self, event, args, group_id, user_id, user_name):
+    async def handle_rank(self, event, args, raw_group_id, group_id, user_id, user_name):
         """财富排行榜（普通用户和管理员均可调用）"""
         limit = 20
         if len(args) >= 3:
@@ -273,6 +316,9 @@ class AdminHandler:
                 pass
             limit = max(5, min(50, limit))
 
+        stock_enabled, stock_group_id = self.plugin.get_stock_binding(raw_group_id)
+        goods_enabled, goods_group_id = self.plugin.get_goods_binding(raw_group_id)
+
         with self.plugin.db.session_scope() as session:
             users = session.query(UserAccount).filter_by(
                 group_id=group_id
@@ -281,12 +327,12 @@ class AdminHandler:
             rank_data = []
             for u in users:
                 wealth = float(u.balance or 0)
-                if self.plugin.stock_market:
-                    holdings = self.plugin.stock_market.get_holdings(group_id, u.user_id)
+                if stock_enabled and self.plugin.stock_market:
+                    holdings = self.plugin.stock_market.get_holdings(stock_group_id, u.user_id)
                     for h in holdings:
                         wealth += float(h.get('market_value', 0))
-                if self.plugin.goods_market:
-                    backpack = self.plugin.goods_market.get_backpack(group_id, u.user_id)
+                if goods_enabled and self.plugin.goods_market:
+                    backpack = self.plugin.goods_market.get_backpack(goods_group_id, u.user_id)
                     for b in backpack:
                         wealth += float(b.get('total_value', 0))
                 rank_data.append({
@@ -323,7 +369,13 @@ class AdminHandler:
             "━━━━━━━━━━━━━━",
             "  /fc admin balance <@用户> <金额>         增减余额",
             "  /fc admin setbalance <@用户> <金额>      设置余额",
-            "  /fc admin stock <open|close|auto>         股市控制",
+            "  /fc admin stock enable [分组ID]          本群启用股市并绑定分组",
+            "  /fc admin stock disable                 本群禁用股市",
+            "  /fc admin stock group [分组ID]           查看/切换本群股市分组",
+            "  /fc admin stock <open|close|auto>        当前股市分组开休市控制",
+            "  /fc admin goods enable [分组ID]          本群启用物资并绑定分组",
+            "  /fc admin goods disable                 本群禁用物资",
+            "  /fc admin goods group [分组ID]           查看/切换本群物资分组",
             "  /fc admin goods add <ID> <名称> <基准价> [图标] [最低价] [最高价] [波动率]",
             "  /fc admin goods remove <物资ID>           移除物资",
             "  /fc admin goods setprice <物资ID> <价格>  设置价格",

@@ -6,7 +6,48 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any, Dict, List
+
+
+def _normalize_id_list(value: Any) -> List[str]:
+    """将配置中的 ID 列表规范化为可直接匹配 event.get_sender_id() 的字符串列表。
+
+    AstrBot 配置面板/手工配置里可能出现数字、带空格字符串、逗号/换行分隔字符串，
+    甚至复制 @ 消息后带 CQ/尖括号格式；这里统一提取为纯 ID 字符串，避免管理员判断失效。
+    """
+    if value is None:
+        return []
+
+    raw_items = value if isinstance(value, (list, tuple, set)) else [value]
+    result: List[str] = []
+    for item in raw_items:
+        text = str(item).strip()
+        if not text:
+            continue
+
+        parts = re.split(r"[\s,，;；]+", text)
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            digit_groups = re.findall(r"\d+", part)
+            if digit_groups:
+                result.extend(digit_groups)
+            else:
+                result.append(part)
+
+    return list(dict.fromkeys(result))
+
+
+def _to_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on", "启用", "是")
+    return bool(value)
 
 
 @dataclass
@@ -23,9 +64,9 @@ class BasicConfig:
         if not data:
             return cls()
         return cls(
-            admin_ids=list(data.get("admin_ids", [])),
-            cross_group_data=bool(data.get("cross_group_data", False)),
-            group_filter_enabled=bool(data.get("group_filter_enabled", False)),
+            admin_ids=_normalize_id_list(data.get("admin_ids", [])),
+            cross_group_data=_to_bool(data.get("cross_group_data", False)),
+            group_filter_enabled=_to_bool(data.get("group_filter_enabled", False)),
             group_whitelist=list(data.get("group_whitelist", [])),
             group_blacklist=list(data.get("group_blacklist", [])),
         )
@@ -89,7 +130,7 @@ class SigninConfig:
         except (ValueError, TypeError):
             signin_max_consecutive = 7
         return cls(
-            signin_enabled=bool(data.get("signin_enabled", True)),
+            signin_enabled=_to_bool(data.get("signin_enabled", True)),
             signin_reward_base=signin_reward_base,
             signin_reward_var=signin_reward_var,
             signin_consecutive_bonus=signin_consecutive_bonus,
@@ -122,7 +163,7 @@ class ChatRewardConfig:
         except (ValueError, TypeError):
             chat_reward_daily_limit = 50
         return cls(
-            chat_reward_enabled=bool(data.get("chat_reward_enabled", True)),
+            chat_reward_enabled=_to_bool(data.get("chat_reward_enabled", True)),
             chat_reward_amount=chat_reward_amount,
             chat_reward_cooldown=chat_reward_cooldown,
             chat_reward_daily_limit=chat_reward_daily_limit,
@@ -164,14 +205,14 @@ class StockConfig:
         except (ValueError, TypeError):
             stock_kline_candles = 50
         return cls(
-            stock_enabled=bool(data.get("stock_enabled", True)),
+            stock_enabled=_to_bool(data.get("stock_enabled", True)),
             stock_companies=list(data.get("stock_companies", [])),
             stock_volatility=stock_volatility,
             stock_update_interval=stock_update_interval,
             stock_fee_rate=stock_fee_rate,
-            stock_trading_hours=bool(data.get("stock_trading_hours", False)),
-            stock_trend_enabled=bool(data.get("stock_trend_enabled", True)),
-            stock_tech_analysis_enabled=bool(data.get("stock_tech_analysis_enabled", True)),
+            stock_trading_hours=_to_bool(data.get("stock_trading_hours", False)),
+            stock_trend_enabled=_to_bool(data.get("stock_trend_enabled", True)),
+            stock_tech_analysis_enabled=_to_bool(data.get("stock_tech_analysis_enabled", True)),
             stock_kline_candles=stock_kline_candles,
             stock_font=str(data.get("stock_font", "")),
         )
@@ -241,10 +282,10 @@ class StockNewsConfig:
         except (ValueError, TypeError):
             stock_news_prob_volatility = 0.10
         return cls(
-            stock_news_enabled=bool(data.get("stock_news_enabled", True)),
+            stock_news_enabled=_to_bool(data.get("stock_news_enabled", True)),
             stock_news_source=str(data.get("stock_news_source", "template")),
             stock_news_trigger_prob=stock_news_trigger_prob,
-            stock_news_broadcast=bool(data.get("stock_news_broadcast", True)),
+            stock_news_broadcast=_to_bool(data.get("stock_news_broadcast", True)),
             stock_news_history_count=stock_news_history_count,
             stock_news_provider_id=str(data.get("stock_news_provider_id", "")),
             stock_llm_prompt_template=str(data.get("stock_llm_prompt_template", "")),
@@ -302,10 +343,10 @@ class GoodsConfig:
         except (ValueError, TypeError):
             goods_user_trade_tax = 0.05
         return cls(
-            goods_enabled=bool(data.get("goods_enabled", True)),
+            goods_enabled=_to_bool(data.get("goods_enabled", True)),
             goods_refresh_interval=goods_refresh_interval,
             goods_price_volatility=goods_price_volatility,
-            goods_user_trade_enabled=bool(data.get("goods_user_trade_enabled", True)),
+            goods_user_trade_enabled=_to_bool(data.get("goods_user_trade_enabled", True)),
             goods_user_trade_tax=goods_user_trade_tax,
         )
 
@@ -329,12 +370,12 @@ class PaidCmdConfig:
         except (ValueError, TypeError):
             paid_cmd_default_cost = 50.0
         return cls(
-            paid_cmd_enabled=bool(data.get("paid_cmd_enabled", False)),
+            paid_cmd_enabled=_to_bool(data.get("paid_cmd_enabled", False)),
             paid_cmd_default_cost=paid_cmd_default_cost,
             paid_cmd_insufficient_msg=str(data.get("paid_cmd_insufficient_msg",
                 "💸 余额不足！执行该指令需要 {cost} {currency}，你当前余额为 {balance} {currency}。")),
             paid_cmd_deduct_msg=str(data.get("paid_cmd_deduct_msg", "")),
-            paid_cmd_ignore_admin=bool(data.get("paid_cmd_ignore_admin", True)),
+            paid_cmd_ignore_admin=_to_bool(data.get("paid_cmd_ignore_admin", True)),
             paid_cmd_prefixes=list(data.get("paid_cmd_prefixes", ["/"])),
         )
 

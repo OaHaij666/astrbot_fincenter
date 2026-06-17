@@ -91,7 +91,7 @@ class AccountHandler:
             f"{self.plugin.config.currency.currency_icon}{self.plugin.config.currency.currency_name}"
         )
 
-    async def handle_me(self, event, group_id, user_id, user_name):
+    async def handle_me(self, event, group_id, user_id, user_name, stock_group_id=None, goods_group_id=None, stock_enabled=True, goods_enabled=True):
         with self.plugin.db.session_scope() as session:
             user = session.query(UserAccount).filter_by(
                 group_id=group_id, user_id=user_id
@@ -110,12 +110,12 @@ class AccountHandler:
         currency_icon = self.plugin.config.currency.currency_icon
 
         holdings = []
-        if self.plugin.stock_market:
-            holdings = self.plugin.stock_market.get_holdings(group_id, user_id)
+        if stock_enabled and stock_group_id and self.plugin.stock_market:
+            holdings = self.plugin.stock_market.get_holdings(stock_group_id, user_id)
 
         backpack = []
-        if self.plugin.goods_market:
-            backpack = self.plugin.goods_market.get_backpack(group_id, user_id)
+        if goods_enabled and goods_group_id and self.plugin.goods_market:
+            backpack = self.plugin.goods_market.get_backpack(goods_group_id, user_id)
 
         result = plotter.render_account_html(
             user_name=user_name,

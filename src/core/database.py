@@ -254,6 +254,22 @@ class GoodsTradeRequest(Base):
     created_at = Column(DateTime, default=get_china_time)
 
 
+class MarketGroupBinding(Base):
+    __tablename__ = 'market_group_bindings'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    physical_group_id = Column(String, nullable=False)
+    module = Column(String, nullable=False)  # stock / goods
+    market_group_id = Column(String, nullable=False)
+    enabled = Column(Integer, default=1)
+    updated_at = Column(DateTime, default=get_china_time)
+
+    __table_args__ = (
+        UniqueConstraint('physical_group_id', 'module', name='uq_market_binding_group_module'),
+        {'sqlite_autoincrement': True},
+    )
+
+
 class ChatRewardState(Base):
     __tablename__ = 'chat_reward_states'
 

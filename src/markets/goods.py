@@ -54,7 +54,7 @@ class GoodsMarket:
     def stop(self):
         self.running = False
         if self.thread:
-            self.thread.join()
+            self.thread.join(timeout=3)
 
     def _loop(self):
         while self.running:
@@ -73,12 +73,13 @@ class GoodsMarket:
         markets = session.query(GoodsMarketPrice).all()
         for market in markets:
             definition = session.query(GoodsDefinition).filter_by(
-                goods_id=market.goods_id
+                group_id=market.group_id, goods_id=market.goods_id
             ).first()
             if definition:
                 market.previous_price = market.current_price
                 base = definition.base_price
-                new_price = base * (1 + random.uniform(-self.price_volatility, self.price_volatility))
+                volatility = definition.volatility if definition.volatility is not None else self.price_volatility
+                new_price = base * (1 + random.uniform(-volatility, volatility))
                 new_price = max(definition.min_price, min(definition.max_price, new_price))
                 market.current_price = round(new_price, 2)
                 market.last_refresh = get_china_time()
@@ -217,7 +218,7 @@ class GoodsMarket:
             definition.preview_image = image_path
         return True
 
-    def buy_goods(self, group_id, user_id, goods_id, amount):
+    def buy_goods(self, group_id, account_group_id, user_id, goods_id, amount):
         with self.lock:
             try:
                 amount = float(amount)
@@ -237,7 +238,7 @@ class GoodsMarket:
                 total_cost = market.current_price * amount
 
                 user = session.query(UserAccount).filter_by(
-                    group_id=group_id, user_id=user_id
+                    group_id=account_group_id, user_id=user_id
                 ).first()
                 if not user:
                     return {"success": False, "msg": "请先开户"}
@@ -272,7 +273,7 @@ class GoodsMarket:
                 "total": total_cost,
             }
 
-    def sell_goods(self, group_id, user_id, goods_id, amount):
+    def sell_goods(self, group_id, account_group_id, user_id, goods_id, amount):
         with self.lock:
             try:
                 amount = float(amount)
@@ -304,7 +305,7 @@ class GoodsMarket:
                     session.delete(backpack)
 
                 user = session.query(UserAccount).filter_by(
-                    group_id=group_id, user_id=user_id
+                    group_id=account_group_id, user_id=user_id
                 ).first()
                 if user:
                     user.add_balance(total_revenue)
@@ -409,7 +410,7 @@ class GoodsMarket:
 
         return {"success": True, "msg": f"交易请求已发送，交易ID: {trade_id}", "trade_id": trade_id}
 
-    def accept_trade(self, group_id, user_id, trade_id):
+    def accept_trade(self, group_id, account_group_id, user_id, trade_id):
         with self.db.session_scope() as session:
             trade = session.query(GoodsTradeRequest).filter_by(
                 id=trade_id, to_user=user_id, group_id=group_id, status="pending"
@@ -423,7 +424,7 @@ class GoodsMarket:
             cost_with_fee = total_cost + fee
 
             buyer = session.query(UserAccount).filter_by(
-                group_id=group_id, user_id=user_id
+                group_id=account_group_id, user_id=user_id
             ).first()
             if not buyer or buyer.balance < cost_with_fee:
                 return {"success": False, "msg": f"余额不足。需要 {cost_with_fee:.2f}"}
@@ -441,7 +442,7 @@ class GoodsMarket:
             buyer.sub_balance(cost_with_fee)
 
             seller = session.query(UserAccount).filter_by(
-                group_id=group_id, user_id=trade.from_user
+                group_id=account_group_id, user_id=trade.from_user
             ).first()
             if seller:
                 seller.add_balance(total_cost)

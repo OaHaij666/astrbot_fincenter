@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 {% if echarts_inline %}
-<script>{{ echarts_inline }}</script>
+<script>{{ echarts_inline | safe }}</script>
 {% elif echarts_cdn %}
 <script src="{{ echarts_cdn }}"></script>
 {% endif %}
@@ -25,15 +25,30 @@
 </head>
 <body>
   <div id="kline"></div>
+  <script type="application/json" id="kline-title">{{ title | tojson }}</script>
+  <script type="application/json" id="kline-dates">{{ dates | tojson }}</script>
+  <script type="application/json" id="kline-ohlc">{{ ohlc | tojson }}</script>
+  <script type="application/json" id="kline-volumes">{{ volumes | tojson }}</script>
+  <script type="application/json" id="kline-ma5">{{ ma5 | tojson }}</script>
+  <script type="application/json" id="kline-ma20">{{ ma20 | tojson }}</script>
+  <script type="application/json" id="kline-support-levels">{{ support_levels | tojson }}</script>
+  <script type="application/json" id="kline-resistance-levels">{{ resistance_levels | tojson }}</script>
   <script>
     var chart = echarts.init(document.getElementById('kline'));
 
+    function readJson(id) {
+      return JSON.parse(document.getElementById(id).textContent || 'null');
+    }
+
     // 解析数据
-    var dates = {{ dates | tojson }};
-    var ohlc = {{ ohlc | tojson }};
-    var volumes = {{ volumes | tojson }};
-    var ma5_in = {{ ma5 | tojson }};
-    var ma20_in = {{ ma20 | tojson }};
+    var chartTitle = readJson('kline-title') || '';
+    var dates = readJson('kline-dates') || [];
+    var ohlc = readJson('kline-ohlc') || [];
+    var volumes = readJson('kline-volumes') || [];
+    var ma5_in = readJson('kline-ma5') || [];
+    var ma20_in = readJson('kline-ma20') || [];
+    var supportLevels = readJson('kline-support-levels') || [];
+    var resistanceLevels = readJson('kline-resistance-levels') || [];
 
     var closes = ohlc.map(function(d) { return d[1]; });
 
@@ -105,7 +120,7 @@
       backgroundColor: '#f5f9ff',
       animation: false,
       title: {
-        text: '{{ title }}',
+        text: chartTitle,
         left: 'center',
         textStyle: { color: '#4a7fa8', fontSize: 15, fontWeight: 'bold' }
       },
@@ -206,27 +221,26 @@
         // 副图2：DEA 慢线
         { name: 'MACD', type: 'line', data: dea, smooth: true, showSymbol: false,
           lineStyle: { color: DEA_C, width: 1 }, xAxisIndex: 2, yAxisIndex: 2 }
-        {% if support_levels or resistance_levels %}
-        {% for s in support_levels %}
-        ,{ name: '支撑 {{ s }}', type: 'line',
-          markLine: { silent: true, symbol: 'none',
-            lineStyle: { color: DOWN, type: 'dotted', width: 1 },
-            data: [{ yAxis: {{ s }} }],
-            label: { formatter: '支撑 {{ s }}', color: DOWN, fontSize: 9,
-              backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
-          xAxisIndex: 0, yAxisIndex: 0, data: [] }
-        {% endfor %}
-        {% for r in resistance_levels %}
-        ,{ name: '阻力 {{ r }}', type: 'line',
-          markLine: { silent: true, symbol: 'none',
-            lineStyle: { color: UP, type: 'dotted', width: 1 },
-            data: [{ yAxis: {{ r }} }],
-            label: { formatter: '阻力 {{ r }}', color: UP, fontSize: 9,
-              backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
-          xAxisIndex: 0, yAxisIndex: 0, data: [] }
-        {% endfor %}
-        {% endif %}
-      ]
+      ].concat(
+        supportLevels.map(function(level) {
+          return { name: '支撑 ' + level, type: 'line',
+            markLine: { silent: true, symbol: 'none',
+              lineStyle: { color: DOWN, type: 'dotted', width: 1 },
+              data: [{ yAxis: level }],
+              label: { formatter: '支撑 ' + level, color: DOWN, fontSize: 9,
+                backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
+            xAxisIndex: 0, yAxisIndex: 0, data: [] };
+        }),
+        resistanceLevels.map(function(level) {
+          return { name: '阻力 ' + level, type: 'line',
+            markLine: { silent: true, symbol: 'none',
+              lineStyle: { color: UP, type: 'dotted', width: 1 },
+              data: [{ yAxis: level }],
+              label: { formatter: '阻力 ' + level, color: UP, fontSize: 9,
+                backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
+            xAxisIndex: 0, yAxisIndex: 0, data: [] };
+        })
+      )
     };
 
     chart.setOption(option);
