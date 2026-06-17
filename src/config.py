@@ -340,6 +340,20 @@ class PaidCmdConfig:
 
 
 @dataclass
+class RenderingConfig:
+    """图片渲染设置"""
+    render_strategy: str = "local"  # "local"=本地Playwright优先, "remote"=远程html_render优先
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RenderingConfig:
+        if not data:
+            return cls()
+        return cls(
+            render_strategy=str(data.get("render_strategy", "local"))
+        )
+
+
+@dataclass
 class FinCenterConfig:
     """FinCenter 插件完整配置
 
@@ -354,6 +368,7 @@ class FinCenterConfig:
     stock_news: StockNewsConfig = field(default_factory=StockNewsConfig)
     goods: GoodsConfig = field(default_factory=GoodsConfig)
     paid_cmd: PaidCmdConfig = field(default_factory=PaidCmdConfig)
+    rendering: RenderingConfig = field(default_factory=RenderingConfig)
 
     @classmethod
     def from_dict(cls, raw: dict) -> FinCenterConfig:
@@ -374,6 +389,7 @@ class FinCenterConfig:
             stock_news=StockNewsConfig.from_dict(_section(raw, "stock_news")),
             goods=GoodsConfig.from_dict(_section(raw, "goods")),
             paid_cmd=PaidCmdConfig.from_dict(_section(raw, "paid_cmd")),
+            rendering=RenderingConfig.from_dict(_section(raw, "rendering")),
         )
 
     # ---- 便捷属性 ----

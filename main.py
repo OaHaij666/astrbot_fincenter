@@ -173,29 +173,36 @@ class FinCenterPlugin(Star):
             else:
                 rendered_html = html_content
 
-            page = await browser.new_page(viewport={"width": 500, "height": 800})
-            await page.set_content(rendered_html, wait_until="networkidle", timeout=15000)
+            # 先渲染内容获取实际尺寸，使用较大的初始 viewport
+            page = await browser.new_page(viewport={"width": 1200, "height": 2000})
+            await page.set_content(rendered_html, wait_until="networkidle", timeout=20000)
 
-            # 等待 ECharts 渲染完成（K线图需要 JS 执行）
-            await page.wait_for_timeout(500)
+            # 等待 ECharts 渲染完成（K线图需要 JS 执行和 CDN 加载）
+            await page.wait_for_timeout(1000)
             try:
+                # 等待 echarts 对象可用
                 await page.wait_for_function(
                     "() => typeof echarts !== 'undefined'",
+                    timeout=8000
+                )
+                # 等待图表实例渲染完成
+                await page.wait_for_function(
+                    "() => { const chart = document.querySelector('div[_echarts_instance_]'); return chart && chart.clientWidth > 0; }",
                     timeout=3000
                 )
-                # 额外等待图表渲染
+                # 额外等待动画完成
                 await page.wait_for_timeout(500)
-            except Exception:
-                pass  # 非 ECharts 页面忽略
+            except Exception as e:
+                logger.debug(f"ECharts 等待超时或非 ECharts 页面: {e}")
 
-            # 获取 body 实际尺寸，精确裁剪到内容边界
+            # 获取内容实际尺寸，精确裁剪到内容边界
             body_size = await page.evaluate("""() => {
                 const body = document.body;
                 const html = document.documentElement;
-                return {
-                    width: Math.min(Math.max(body.scrollWidth, body.offsetWidth), 600),
-                    height: Math.max(body.scrollHeight, body.offsetHeight)
-                };
+                // 使用 scrollWidth/scrollHeight 获取完整内容尺寸
+                const width = Math.max(body.scrollWidth, body.offsetWidth, html.scrollWidth, html.offsetWidth);
+                const height = Math.max(body.scrollHeight, body.offsetHeight, html.scrollHeight, html.offsetHeight);
+                return { width, height };
             }""")
 
             # 截图选项 - 用 clip 精确裁剪，避免右侧空白
@@ -231,14 +238,8 @@ class FinCenterPlugin(Star):
                 except Exception:
                     pass
 
-    async def _render_image(self, html_content, data=None, options=None):
-        """渲染 HTML 为图片：优先本地 Playwright，失败回退远程 html_render"""
-        # 1. 尝试本地 Playwright
-        local_path = await self._render_image_local(html_content, data, options)
-        if local_path:
-            return local_path
-
-        # 2. 回退远程 html_render
+    async def _render_image_remote(self, html_content, data=None, options=None):
+        """使用远程 html_render 渲染"""
         try:
             image_data = await self.html_render(
                 html_content,
@@ -259,8 +260,27 @@ class FinCenterPlugin(Star):
                 logger.warning(f"html_render 返回了意外类型: {type(image_data)}")
                 return None
         except Exception as e:
-            logger.error(f"远程 html_render 也失败: {e}")
+            logger.error(f"远程 html_render 失败: {e}")
             return None
+
+    async def _render_image(self, html_content, data=None, options=None):
+        """渲染 HTML 为图片：根据配置选择优先策略，失败自动回退"""
+        strategy = self.config.rendering.render_strategy
+
+        if strategy == "local":
+            # 优先本地 Playwright，失败回退远程
+            local_path = await self._render_image_local(html_content, data, options)
+            if local_path:
+                return local_path
+            # 回退远程 html_render
+            return await self._render_image_remote(html_content, data, options)
+        else:
+            # 优先远程 html_render，失败回退本地
+            remote_path = await self._render_image_remote(html_content, data, options)
+            if remote_path:
+                return remote_path
+            # 回退本地 Playwright
+            return await self._render_image_local(html_content, data, options)
 
     def _process_chat_reward(self, group_id: str, user_id: str, user_name: str):
         cfg = self.config.chat_reward

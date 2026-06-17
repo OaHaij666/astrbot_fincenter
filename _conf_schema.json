@@ -336,5 +336,17 @@
         "default": ["/"]
       }
     }
+  },
+  "rendering": {
+    "description": "图片渲染策略",
+    "type": "object",
+    "items": {
+      "render_strategy": {
+        "description": "渲染策略（local=优先本地Playwright，remote=优先远程html_render）",
+        "type": "string",
+        "options": ["local", "remote"],
+        "default": "local"
+      }
+    }
   }
 }

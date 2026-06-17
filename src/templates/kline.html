@@ -2,18 +2,23 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<script src="{{ echarts_path }}"></script>
+{% if echarts_inline %}
+<script>{{ echarts_inline }}</script>
+{% elif echarts_cdn %}
+<script src="{{ echarts_cdn }}"></script>
+{% endif %}
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    width: 500px;
+    width: fit-content;
+    min-width: 480px;
     font-family: 'Source Han Sans SC', 'Microsoft YaHei', 'SimHei', sans-serif;
     background: #f5f9ff;
     padding: 12px;
     margin: 0;
   }
   #kline {
-    width: 476px;
+    width: 460px;
     height: 480px;
   }
 </style>
@@ -201,8 +206,7 @@
         // 副图2：DEA 慢线
         { name: 'MACD', type: 'line', data: dea, smooth: true, showSymbol: false,
           lineStyle: { color: DEA_C, width: 1 }, xAxisIndex: 2, yAxisIndex: 2 }
-
-        {% if support_levels %}
+        {% if support_levels or resistance_levels %}
         {% for s in support_levels %}
         ,{ name: '支撑 {{ s }}', type: 'line',
           markLine: { silent: true, symbol: 'none',
@@ -212,8 +216,6 @@
               backgroundColor: 'rgba(255,255,255,0.85)', padding: [2,3], borderRadius: 2 } },
           xAxisIndex: 0, yAxisIndex: 0, data: [] }
         {% endfor %}
-        {% endif %}
-        {% if resistance_levels %}
         {% for r in resistance_levels %}
         ,{ name: '阻力 {{ r }}', type: 'line',
           markLine: { silent: true, symbol: 'none',

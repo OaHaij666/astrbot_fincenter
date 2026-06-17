@@ -95,12 +95,23 @@ def render_kline_html(history_list, title="K线走势", tech_levels=None, max_ca
         if 'resistance' in tech_levels and tech_levels['resistance']:
             resistance_levels = tech_levels['resistance']
 
-    # 检查本地 ECharts 文件
+    # ECharts 来源：优先内联本地文件，失败回退 CDN
+    # Playwright 的 set_content 无法加载 file:/// 路径的 script 标签
+    echarts_inline = None
+    echarts_cdn = None
+
     echarts_path = os.path.join(_assets_dir, 'js', 'echarts.min.js')
     if os.path.exists(echarts_path):
-        echarts_src = 'file:///' + os.path.abspath(echarts_path).replace('\\', '/')
-    else:
-        echarts_src = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js'
+        try:
+            with open(echarts_path, 'r', encoding='utf-8') as f:
+                echarts_inline = f.read()
+            logger.debug(f"已内联本地 ECharts: {len(echarts_inline)} bytes")
+        except Exception as e:
+            logger.warning(f"读取本地 ECharts 失败: {e}")
+
+    if echarts_inline is None:
+        echarts_cdn = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js'
+        logger.debug("使用 CDN 加载 ECharts")
 
     env = _get_jinja()
     template = env.get_template('kline.html')
@@ -113,7 +124,8 @@ def render_kline_html(history_list, title="K线走势", tech_levels=None, max_ca
         ma20=ma20_data,
         support_levels=support_levels,
         resistance_levels=resistance_levels,
-        echarts_path=echarts_src,
+        echarts_inline=echarts_inline,
+        echarts_cdn=echarts_cdn,
     )
 
     # html_render 签名: html_render(html, data, options=options)
