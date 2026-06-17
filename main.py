@@ -7,7 +7,6 @@ module_path 匹配，从而正确绑定 self。
   - html_render 调用签名: html_render(html_content, data_dict, return_url, options)
   - 图片通过 event.image_result() 发送
 """
-import base64
 import os
 import sys
 import tempfile
@@ -24,11 +23,14 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from src.config import FinCenterConfig
-from src.core.database import DB, ChatRewardState, UserAccount, PaidCommand, MarketGroupBinding, get_china_time
-from src.markets.stock import StockMarket
-from src.markets.goods import GoodsMarket
+from src.core.database import DB
+from src.services.market_manager import MarketManager
+from src.services.rewards import ChatRewardService
+from src.services.paid_command import PaidCommandService
 from src.handlers import AccountHandler, StockHandler, GoodsHandler, AdminHandler
 from src.utils import plotter
+from src.utils.renderer import LocalHtmlRenderer
+from src.utils.help_builder import build_main_help_sections, build_main_help_text
 from migrations.migrate import migrate, set_paths as set_migrate_paths
 
 
@@ -41,6 +43,9 @@ class FinCenterPlugin(Star):
         self._setup_paths()
         self._setup_config()
         self._setup_database()
+        self.reward_service = ChatRewardService(self.db, self.config)
+        self.paid_command_service = PaidCommandService(self.db, self.config)
+        self.local_renderer = LocalHtmlRenderer()
         self._setup_handlers()
         self._setup_markets()
 
@@ -99,6 +104,7 @@ class FinCenterPlugin(Star):
     def _setup_markets(self):
         self.stock_market = None
         self.goods_market = None
+        self.market_manager = MarketManager(self)
 
         if self.config.stock.stock_enabled:
             self.enable_stock_market(update_config=False)
@@ -106,113 +112,31 @@ class FinCenterPlugin(Star):
         if self.config.goods.goods_enabled:
             self.enable_goods_market(update_config=False)
 
-    def _set_raw_config_value(self, section: str, key: str, value):
-        section_data = self._raw_config.setdefault(section, {})
-        if isinstance(section_data, dict):
-            section_data[key] = value
-
     def enable_stock_market(self, update_config: bool = True):
-        if self.stock_market:
-            return False, "股市模块已启用"
-        if update_config:
-            self.config.stock.stock_enabled = True
-            self._set_raw_config_value("stock", "stock_enabled", True)
-        self.stock_market = StockMarket(
-            self.db,
-            stock_config=self.config.stock,
-            news_config=self.config.stock_news,
-        )
-        self.stock_market.start()
-        logger.info("Stock market started")
-        return True, "✅ 股市模块已启用"
+        return self.market_manager.enable_stock(update_config)
 
     def disable_stock_market(self, update_config: bool = True):
-        if not self.stock_market:
-            if update_config:
-                self.config.stock.stock_enabled = False
-                self._set_raw_config_value("stock", "stock_enabled", False)
-            return False, "股市模块已禁用"
-        self.stock_market.stop()
-        self.stock_market = None
-        if update_config:
-            self.config.stock.stock_enabled = False
-            self._set_raw_config_value("stock", "stock_enabled", False)
-        logger.info("Stock market stopped")
-        return True, "✅ 股市模块已禁用"
+        return self.market_manager.disable_stock(update_config)
 
     def enable_goods_market(self, update_config: bool = True):
-        if self.goods_market:
-            return False, "物资模块已启用"
-        if update_config:
-            self.config.goods.goods_enabled = True
-            self._set_raw_config_value("goods", "goods_enabled", True)
-        self.goods_market = GoodsMarket(
-            self.db,
-            config=self.config.goods,
-        )
-        self.goods_market.start()
-        logger.info("Goods market started")
-        return True, "✅ 物资模块已启用"
+        return self.market_manager.enable_goods(update_config)
 
     def disable_goods_market(self, update_config: bool = True):
-        if not self.goods_market:
-            if update_config:
-                self.config.goods.goods_enabled = False
-                self._set_raw_config_value("goods", "goods_enabled", False)
-            return False, "物资模块已禁用"
-        self.goods_market.stop()
-        self.goods_market = None
-        if update_config:
-            self.config.goods.goods_enabled = False
-            self._set_raw_config_value("goods", "goods_enabled", False)
-        logger.info("Goods market stopped")
-        return True, "✅ 物资模块已禁用"
+        return self.market_manager.disable_goods(update_config)
 
     def _resolve_group_id(self, group_id: str) -> str:
         if self.config.basic.cross_group_data:
             return "__global__"
         return group_id
 
-    def _get_market_binding(self, physical_group_id: str, module: str) -> tuple[bool, str]:
-        """返回本物理群在指定模块上的启用状态和市场分组 ID。"""
-        default_group = str(physical_group_id)
-        with self.db.session_scope() as session:
-            binding = session.query(MarketGroupBinding).filter_by(
-                physical_group_id=default_group,
-                module=module,
-            ).first()
-            if not binding:
-                return True, default_group
-            return bool(binding.enabled), binding.market_group_id or default_group
-
     def get_stock_binding(self, physical_group_id: str) -> tuple[bool, str]:
-        return self._get_market_binding(physical_group_id, "stock")
+        return self.db.get_market_binding(physical_group_id, "stock")
 
     def get_goods_binding(self, physical_group_id: str) -> tuple[bool, str]:
-        return self._get_market_binding(physical_group_id, "goods")
+        return self.db.get_market_binding(physical_group_id, "goods")
 
     def set_market_binding(self, physical_group_id: str, module: str, market_group_id: str = None, enabled: bool = True):
-        market_group_id = (market_group_id or physical_group_id or "").strip()
-        physical_group_id = str(physical_group_id)
-        with self.db.session_scope() as session:
-            binding = session.query(MarketGroupBinding).filter_by(
-                physical_group_id=physical_group_id,
-                module=module,
-            ).first()
-            if not binding:
-                binding = MarketGroupBinding(
-                    physical_group_id=physical_group_id,
-                    module=module,
-                    market_group_id=market_group_id,
-                    enabled=1 if enabled else 0,
-                    updated_at=get_china_time(),
-                )
-                session.add(binding)
-            else:
-                binding.market_group_id = market_group_id
-                binding.enabled = 1 if enabled else 0
-                binding.updated_at = get_china_time()
-        return enabled, market_group_id
+        return self.db.set_market_binding(physical_group_id, module, market_group_id, enabled)
 
     def _check_group_allowed(self, group_id: str) -> bool:
         cfg = self.config.basic
@@ -226,125 +150,6 @@ class FinCenterPlugin(Star):
 
     # ── 图片渲染与发送 ────────────────────────────────────────
     # 渲染策略：优先本地 Playwright → 回退远程 html_render → 回退文字
-    # 通过 event.image_result(文件路径) 发送，框架自动处理文件读取和上传
-    # 必须用 yield 返回结果，否则框架不知道已响应，会继续走 LLM
-
-    _playwright_instance = None
-    _playwright_browser = None
-
-    @classmethod
-    async def _get_playwright_browser(cls):
-        """懒加载 Playwright 浏览器实例（全局单例）"""
-        if cls._playwright_browser and cls._playwright_browser.is_connected():
-            return cls._playwright_browser
-        try:
-            from playwright.async_api import async_playwright
-            if cls._playwright_instance is None:
-                cls._playwright_instance = await async_playwright().start()
-            if cls._playwright_browser is None or not cls._playwright_browser.is_connected():
-                cls._playwright_browser = await cls._playwright_instance.chromium.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-gpu'],
-                )
-            return cls._playwright_browser
-        except Exception as e:
-            logger.warning(f"Playwright 不可用: {e}")
-            return None
-
-    async def _render_image_local(self, html_content, data=None, options=None):
-        """使用本地 Playwright 渲染 HTML 为图片，返回文件路径或 None"""
-        browser = await self._get_playwright_browser()
-        if not browser:
-            return None
-
-        import jinja2
-        page = None
-        try:
-            # Jinja2 渲染
-            if data:
-                tmpl = jinja2.Template(html_content)
-                rendered_html = tmpl.render(**data)
-            else:
-                rendered_html = html_content
-
-            # 先渲染内容获取实际尺寸，使用较大的初始 viewport
-            page = await browser.new_page(viewport={"width": 1200, "height": 2000})
-            await page.set_content(rendered_html, wait_until="networkidle", timeout=20000)
-
-            # 等待 ECharts 渲染完成（K线图需要 JS 执行和 CDN 加载）
-            await page.wait_for_timeout(1000)
-            try:
-                # 等待 echarts 对象可用
-                await page.wait_for_function(
-                    "() => typeof echarts !== 'undefined'",
-                    timeout=8000
-                )
-                # 等待图表实例渲染完成
-                await page.wait_for_function(
-                    "() => { const chart = document.querySelector('div[_echarts_instance_]'); return chart && chart.clientWidth > 0; }",
-                    timeout=3000
-                )
-                # 额外等待动画完成
-                await page.wait_for_timeout(500)
-            except Exception as e:
-                logger.debug(f"ECharts 等待超时或非 ECharts 页面: {e}")
-
-            # 获取内容实际尺寸，精确裁剪到 body/子元素的真实边界。
-            # 不使用 documentElement 的 scroll/offset 尺寸：它至少等于 viewport，
-            # 会把 1200x2000（或远端默认 1280x720）的空白区域一起截进去。
-            content_box = await page.evaluate("""() => {
-                const body = document.body;
-                const bodyRect = body.getBoundingClientRect();
-                let right = bodyRect.right;
-                let bottom = bodyRect.bottom;
-
-                for (const el of body.querySelectorAll('*')) {
-                    const rect = el.getBoundingClientRect();
-                    if (!rect.width && !rect.height) continue;
-                    right = Math.max(right, rect.right);
-                    bottom = Math.max(bottom, rect.bottom);
-                }
-
-                return {
-                    x: 0,
-                    y: 0,
-                    width: Math.max(1, Math.ceil(right)),
-                    height: Math.max(1, Math.ceil(bottom)),
-                };
-            }""")
-
-            # 截图选项 - 用 clip 精确裁剪，避免右侧空白
-            opts = options or {}
-            screenshot_opts = {
-                "type": opts.get("type", "png"),
-                "clip": {
-                    "x": content_box["x"],
-                    "y": content_box["y"],
-                    "width": content_box["width"],
-                    "height": content_box["height"],
-                },
-            }
-            if opts.get("quality"):
-                screenshot_opts["quality"] = opts["quality"]
-
-            img_bytes = await page.screenshot(**screenshot_opts)
-
-            # 保存到临时文件
-            suffix = ".jpg" if screenshot_opts["type"] == "jpeg" else ".png"
-            tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False, dir=self.cache_dir)
-            tmp.write(img_bytes)
-            tmp.close()
-            return tmp.name
-
-        except Exception as e:
-            logger.warning(f"本地 Playwright 渲染失败: {e}")
-            return None
-        finally:
-            if page:
-                try:
-                    await page.close()
-                except Exception:
-                    pass
 
     async def _render_image_remote(self, html_content, data=None, options=None):
         """使用远程 html_render 渲染"""
@@ -377,7 +182,7 @@ class FinCenterPlugin(Star):
 
         if strategy == "local":
             # 优先本地 Playwright，失败回退远程
-            local_path = await self._render_image_local(html_content, data, options)
+            local_path = await self.local_renderer.render(html_content, data, options, self.cache_dir)
             if local_path:
                 return local_path
             # 回退远程 html_render
@@ -388,113 +193,7 @@ class FinCenterPlugin(Star):
             if remote_path:
                 return remote_path
             # 回退本地 Playwright
-            return await self._render_image_local(html_content, data, options)
-
-    def _process_chat_reward(self, group_id: str, user_id: str, user_name: str):
-        cfg = self.config.chat_reward
-        if not cfg.chat_reward_enabled:
-            return
-
-        with self.db.session_scope() as session:
-            user = session.query(UserAccount).filter_by(
-                group_id=group_id, user_id=user_id
-            ).first()
-            if not user:
-                return
-
-            now = get_china_time()
-            today = now.strftime('%Y-%m-%d')
-
-            state = session.query(ChatRewardState).filter_by(
-                group_id=group_id, user_id=user_id
-            ).first()
-
-            if not state:
-                state = ChatRewardState(
-                    group_id=group_id,
-                    user_id=user_id,
-                    last_reward_time=now,
-                    daily_count=1,
-                    last_reset_date=today,
-                )
-                session.add(state)
-                session.flush()
-            else:
-                if state.last_reset_date != today:
-                    state.daily_count = 0
-                    state.last_reset_date = today
-
-                if state.daily_count >= cfg.chat_reward_daily_limit:
-                    return
-
-                if state.last_reward_time:
-                    elapsed = (now - state.last_reward_time).total_seconds()
-                    if elapsed < cfg.chat_reward_cooldown:
-                        return
-
-            user.add_balance(cfg.chat_reward_amount)
-            user.add_earned(cfg.chat_reward_amount)
-            state.last_reward_time = now
-            state.daily_count += 1
-
-    def _check_paid_command(self, message: str, group_id: str, user_id: str) -> str | None:
-        cfg = self.config.paid_cmd
-        if not cfg.paid_cmd_enabled:
-            return None
-
-        matched_prefix = None
-        for prefix in cfg.paid_cmd_prefixes:
-            if message.startswith(prefix) and len(message) > len(prefix):
-                matched_prefix = prefix
-                break
-
-        if not matched_prefix:
-            return None
-
-        cmd_text = message[len(matched_prefix):].split()[0] if message[len(matched_prefix):] else ""
-        if not cmd_text:
-            return None
-
-        with self.db.session_scope() as session:
-            paid_cmd = session.query(PaidCommand).filter_by(
-                group_id=group_id, command=cmd_text, enabled=1
-            ).first()
-
-            if not paid_cmd:
-                return None
-
-            is_admin = str(user_id) in self.config.admin_id_set
-            if is_admin and cfg.paid_cmd_ignore_admin:
-                return None
-
-            user = session.query(UserAccount).filter_by(
-                group_id=group_id, user_id=user_id
-            ).first()
-            if not user:
-                return cfg.paid_cmd_insufficient_msg.format(
-                    cost=paid_cmd.cost,
-                    currency=self.config.currency.currency_name,
-                    balance=0.0,
-                )
-
-            if user.balance < paid_cmd.cost:
-                return cfg.paid_cmd_insufficient_msg.format(
-                    cost=paid_cmd.cost,
-                    currency=self.config.currency.currency_name,
-                    balance=user.balance,
-                )
-
-            user.sub_balance(paid_cmd.cost)
-            user.add_spent(paid_cmd.cost)
-
-            if cfg.paid_cmd_deduct_msg:
-                return cfg.paid_cmd_deduct_msg.format(
-                    cost=paid_cmd.cost,
-                    currency=self.config.currency.currency_name,
-                    balance=user.balance,
-                )
-
-        return None
+            return await self.local_renderer.render(html_content, data, options, self.cache_dir)
 
     # ── 命令注册 ──────────────────────────────────────────────
     # 对齐参考项目: 使用 @filter.command() 平级注册，不使用 command_group
@@ -518,38 +217,7 @@ class FinCenterPlugin(Star):
             # 显示总帮助
             result = plotter.render_help_html(
                 title="💰 财富中心",
-                sections=[
-                    {
-                        'section_name': '👤 账户',
-                        'commands': [
-                            {'cmd': '/fc open', 'desc': '开户'},
-                            {'cmd': '/fc me', 'desc': '我的账户'},
-                            {'cmd': '/fc sign', 'desc': '每日签到'},
-                            {'cmd': '/fc transfer <@用户> <金额>', 'desc': '转账'},
-                            {'cmd': '/fc rank [条数]', 'desc': '财富排行榜'},
-                        ],
-                    },
-                    {
-                        'section_name': '📈 股市',
-                        'commands': [
-                            {'cmd': '/fc stock market', 'desc': '股市总览'},
-                            {'cmd': '/fc stock buy <代码> <数量>', 'desc': '买入股票'},
-                            {'cmd': '/fc stock sell <代码> <数量>', 'desc': '卖出股票'},
-                            {'cmd': '/fc stock assets', 'desc': '我的持仓'},
-                            {'cmd': '/fc stock kline <代码> [条数]', 'desc': 'K线图'},
-                            {'cmd': '/fc stock news', 'desc': '市场新闻'},
-                        ],
-                    },
-                    {
-                        'section_name': '📦 物资',
-                        'commands': [
-                            {'cmd': '/fc goods market', 'desc': '物资市场'},
-                            {'cmd': '/fc goods buy <ID> <数量>', 'desc': '买入物资'},
-                            {'cmd': '/fc goods sell <ID> <数量>', 'desc': '卖出物资'},
-                            {'cmd': '/fc goods backpack', 'desc': '我的背包'},
-                        ],
-                    },
-                ],
+                sections=build_main_help_sections(),
                 tips=['先 /fc open 开户，再 /fc sign 签到领币'],
             )
             if result:
@@ -610,68 +278,27 @@ class FinCenterPlugin(Star):
             return
 
         # 聊天奖励
-        self._process_chat_reward(group_id, user_id, user_name)
+        self.reward_service.process(group_id, user_id, user_name)
 
         # 付费指令检查
         message = event.message_str.strip()
-        paid_msg = self._check_paid_command(message, group_id, user_id)
+        paid_msg = self.paid_command_service.check_and_deduct(message, group_id, user_id)
         if paid_msg:
             yield event.plain_result(paid_msg)
 
     # ── 生命周期 ──────────────────────────────────────────────
 
     async def terminate(self):
-        if self.stock_market:
-            self.stock_market.stop()
-            logger.info("Stock market stopped")
-        if self.goods_market:
-            self.goods_market.stop()
-            logger.info("Goods market stopped")
-        # 关闭 Playwright
-        if self._playwright_browser:
-            try:
-                await self._playwright_browser.close()
-            except Exception:
-                pass
-            self.__class__._playwright_browser = None
-        if self._playwright_instance:
-            try:
-                await self._playwright_instance.stop()
-            except Exception:
-                pass
-            self.__class__._playwright_instance = None
+        self.market_manager.stop_all()
+        await self.local_renderer.close()
 
     def __del__(self):
-        if self.stock_market:
-            self.stock_market.stop()
-        if self.goods_market:
-            self.goods_market.stop()
+        try:
+            self.market_manager.stop_all()
+        except Exception:
+            pass
 
     # ── 纯文本帮助回退 ────────────────────────────────────────
 
     def _get_main_help_text(self):
-        lines = [
-            "💰 财富中心",
-            "━━━━━━━━━━━━━━",
-            "👤 账户:",
-            "  /fc open                    开户",
-            "  /fc me                      我的账户",
-            "  /fc sign                    每日签到",
-            "  /fc transfer <@用户> <金额>   转账",
-            "  /fc rank [条数]              财富排行榜",
-            "",
-            "📈 股市:",
-            "  /fc stock market            股市总览",
-            "  /fc stock buy <代码> <数量>   买入",
-            "  /fc stock sell <代码> <数量>  卖出",
-            "  /fc stock assets            我的持仓",
-            "  /fc stock kline <代码> [条数] K线图",
-            "  /fc stock news              市场新闻",
-            "",
-            "📦 物资:",
-            "  /fc goods market            物资市场",
-            "  /fc goods buy <ID> <数量>    买入物资",
-            "  /fc goods sell <ID> <数量>   卖出物资",
-            "  /fc goods backpack          我的背包",
-        ]
-        return "\n".join(lines)
+        return build_main_help_text()

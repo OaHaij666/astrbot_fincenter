@@ -7,7 +7,7 @@
 import requests
 from contextlib import contextmanager
 from decimal import Decimal
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, text, Numeric, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Numeric, UniqueConstraint
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timedelta, timezone
 
@@ -335,6 +335,42 @@ class DB:
     def get_session(self):
         """获取裸 Session（不推荐，优先使用 session_scope）"""
         return self.Session()
+
+    def get_market_binding(self, physical_group_id, module):
+        """获取物理群在 stock/goods 模块上的启用状态与市场分组。"""
+        physical_group_id = str(physical_group_id)
+        with self.session_scope() as session:
+            binding = session.query(MarketGroupBinding).filter_by(
+                physical_group_id=physical_group_id,
+                module=module,
+            ).first()
+            if not binding:
+                return True, physical_group_id
+            return bool(binding.enabled), binding.market_group_id or physical_group_id
+
+    def set_market_binding(self, physical_group_id, module, market_group_id=None, enabled=True):
+        """设置物理群在 stock/goods 模块上的市场分组绑定。"""
+        physical_group_id = str(physical_group_id)
+        market_group_id = str(market_group_id or physical_group_id).strip()
+        with self.session_scope() as session:
+            binding = session.query(MarketGroupBinding).filter_by(
+                physical_group_id=physical_group_id,
+                module=module,
+            ).first()
+            if not binding:
+                binding = MarketGroupBinding(
+                    physical_group_id=physical_group_id,
+                    module=module,
+                    market_group_id=market_group_id,
+                    enabled=1 if enabled else 0,
+                    updated_at=get_china_time(),
+                )
+                session.add(binding)
+            else:
+                binding.market_group_id = market_group_id
+                binding.enabled = 1 if enabled else 0
+                binding.updated_at = get_china_time()
+        return enabled, market_group_id
 
     def get_or_create_user(self, session, group_id, user_id, user_name='', initial_balance=1000.0):
         """查询或创建用户账户
