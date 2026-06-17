@@ -1,8 +1,8 @@
 """股市/物资市场生命周期管理。"""
 from astrbot.api import logger
 
-from ..markets.stock import StockMarket
-from ..markets.goods import GoodsMarket
+from src.markets.stock import StockMarket
+from src.markets.goods import GoodsMarket
 
 
 class MarketManager:

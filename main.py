@@ -130,13 +130,19 @@ class FinCenterPlugin(Star):
         return group_id
 
     def get_stock_binding(self, physical_group_id: str) -> tuple[bool, str]:
-        return self.db.get_market_binding(physical_group_id, "stock")
+        if hasattr(self.db, "get_market_binding"):
+            return self.db.get_market_binding(physical_group_id, "stock")
+        return True, str(physical_group_id)
 
     def get_goods_binding(self, physical_group_id: str) -> tuple[bool, str]:
-        return self.db.get_market_binding(physical_group_id, "goods")
+        if hasattr(self.db, "get_market_binding"):
+            return self.db.get_market_binding(physical_group_id, "goods")
+        return True, str(physical_group_id)
 
     def set_market_binding(self, physical_group_id: str, module: str, market_group_id: str = None, enabled: bool = True):
-        return self.db.set_market_binding(physical_group_id, module, market_group_id, enabled)
+        if hasattr(self.db, "set_market_binding"):
+            return self.db.set_market_binding(physical_group_id, module, market_group_id, enabled)
+        return enabled, str(market_group_id or physical_group_id)
 
     def _check_group_allowed(self, group_id: str) -> bool:
         cfg = self.config.basic
@@ -266,9 +272,14 @@ class FinCenterPlugin(Star):
 
     # ── 聊天奖励（事件监听）──────────────────────────────────
 
-    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=200)
     async def on_group_message(self, event: AstrMessageEvent):
-        """群消息事件：处理聊天奖励和付费指令"""
+        """群消息事件：处理聊天奖励和付费指令拦截。
+
+        priority=200 让本 handler 在其他插件命令 handler 之前执行，
+        命中付费指令时先扣费再放行；插件抛异常会触发 ``on_plugin_error``，
+        我们的 hook 会读取 ``fc_paid_record`` 并退款。
+        """
         raw_group_id = self._extract_raw_group_id(event)
         group_id = self._resolve_group_id(raw_group_id)
         user_id = str(event.get_sender_id())
@@ -282,9 +293,57 @@ class FinCenterPlugin(Star):
 
         # 付费指令检查
         message = event.message_str.strip()
-        paid_msg = self.paid_command_service.check_and_deduct(message, group_id, user_id)
-        if paid_msg:
-            yield event.plain_result(paid_msg)
+        if not message:
+            return
+        # 跳过本插件自己的命令，避免误扣费
+        if message.startswith(("fc", "/fc", "财富中心", "fincenter")):
+            return
+
+        status, reply, record = self.paid_command_service.try_deduct(
+            message, group_id, user_id
+        )
+        if status == "charged" and record is not None:
+            event.set_extra("fc_paid_record", record)
+            if reply:
+                yield event.plain_result(reply)
+            return  # 不 stop_event，让事件继续传播给其他插件
+        if status in ("insufficient", "no_account") and reply:
+            yield event.plain_result(reply)
+            event.stop_event()  # 余额不足，阻止事件继续传播
+            return
+
+    @filter.on_plugin_error()
+    async def on_plugin_error(
+        self,
+        event: AstrMessageEvent,
+        plugin_name: str,
+        handler_name: str,
+        error: Exception,
+        traceback_text: str,
+    ):
+        """目标插件 handler 抛异常时退款。"""
+        record = event.get_extra("fc_paid_record")
+        if not record:
+            return
+        # 自身报错不退（避免循环）
+        if plugin_name == "FinCenter":
+            return
+        try:
+            ok = self.paid_command_service.refund(record)
+        except Exception as e:
+            logger.warning(f"付费指令退款异常: {e}")
+            return
+        # 清除 extra，避免重复退款
+        event.set_extra("fc_paid_record", None)
+        if ok:
+            cost = record.get("cost", 0)
+            currency_icon = self.config.currency.currency_icon
+            try:
+                yield event.plain_result(
+                    f"⚠️ 插件调用失败，已退还 {currency_icon}{float(cost):.2f}"
+                )
+            except Exception:
+                pass
 
     # ── 生命周期 ──────────────────────────────────────────────
 

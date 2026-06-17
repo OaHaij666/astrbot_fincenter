@@ -5,6 +5,7 @@
 图片渲染对齐参考项目: html_render → 文件路径 → event.image_result(文件路径)
 """
 from ..core.database import UserAccount, GoodsDefinition, GoodsMarketPrice
+from ..services.command_registry import list_other_plugin_commands
 from ..utils import plotter
 
 
@@ -52,6 +53,17 @@ class AdminHandler:
                             {'cmd': '/fc admin goods setprice <ID> <价>', 'desc': '设置价格'},
                             {'cmd': '/fc admin goods setvolatility <ID> <率>', 'desc': '设置波动率'},
                             {'cmd': '/fc admin goods reset', 'desc': '重置所有物资价格至基准价'},
+                        ],
+                    },
+                    {
+                        'section_name': '💴 付费指令',
+                        'commands': [
+                            {'cmd': '/fc admin paidcmd list', 'desc': '查看付费指令配置'},
+                            {'cmd': '/fc admin paidcmd scan', 'desc': '扫描其他插件命令'},
+                            {'cmd': '/fc admin paidcmd add <cmd> <cost> [描述]', 'desc': '本群付费指令'},
+                            {'cmd': '/fc admin paidcmd add *:<cmd> <cost>', 'desc': '全局付费指令'},
+                            {'cmd': '/fc admin paidcmd remove <cmd> [*]', 'desc': '移除付费指令'},
+                            {'cmd': '/fc admin paidcmd toggle <cmd> [*]', 'desc': '启停付费指令'},
                         ],
                     },
                 ],
@@ -303,8 +315,113 @@ class AdminHandler:
                     "格式: /fc admin goods <add|remove|setprice|setvolatility|reset> ..."
                 )
 
+        elif sub == "paidcmd":
+            async for r in self._handle_paidcmd(event, args, raw_group_id, group_id):
+                yield r
+
         else:
             yield event.plain_result("未知管理指令")
+
+    async def _handle_paidcmd(self, event, args, raw_group_id, group_id):
+        action = args[3] if len(args) >= 4 else None
+        service = self.plugin.paid_command_service
+
+        if action in (None, "list"):
+            rows = service.list_paid_commands(raw_group_id)
+            if not rows:
+                yield event.plain_result(
+                    "本群暂无付费指令配置\n"
+                    "添加: /fc admin paidcmd add <command> <cost> [描述]\n"
+                    "扫描: /fc admin paidcmd scan"
+                )
+                return
+            currency_icon = self.plugin.config.currency.currency_icon
+            lines = [f"💴 付费指令配置（{raw_group_id}）", "━━━━━━━━━━━━━━"]
+            for r in rows:
+                state = "✅" if r["enabled"] else "🚫"
+                scope = "全局" if r["group_id"] == service.GLOBAL_GROUP else r["group_id"]
+                desc = f"  {r['description']}" if r["description"] else ""
+                lines.append(
+                    f"{state} [{scope}] {r['command']}  "
+                    f"{currency_icon}{r['cost']:.2f}{desc}"
+                )
+            yield event.plain_result("\n".join(lines))
+            return
+
+        if action == "scan":
+            cmds = list_other_plugin_commands()
+            if not cmds:
+                yield event.plain_result("未发现可拦截的其他插件命令")
+                return
+            lines = ["🔍 可被拦截的其他插件命令", "━━━━━━━━━━━━━━"]
+            for c in cmds[:80]:
+                desc = f"  - {c['desc']}" if c["desc"] else ""
+                lines.append(f"[{c['plugin']}] {c['command']}{desc}")
+            if len(cmds) > 80:
+                lines.append(f"…… 共 {len(cmds)} 条，仅显示前 80")
+            yield event.plain_result("\n".join(lines))
+            return
+
+        if action == "add":
+            if len(args) < 6:
+                yield event.plain_result("格式: /fc admin paidcmd add <command> <cost> [描述]")
+                return
+            command = args[4]
+            try:
+                cost = float(args[5])
+            except ValueError:
+                yield event.plain_result("费用格式错误")
+                return
+            description = " ".join(args[6:]) if len(args) > 6 else ""
+            scope = raw_group_id
+            if command.startswith("*:"):
+                scope = service.GLOBAL_GROUP
+                command = command[2:]
+            ok = service.add_paid_command(scope, command, cost, description)
+            if ok:
+                scope_label = "全局" if scope == service.GLOBAL_GROUP else f"群 {scope}"
+                yield event.plain_result(
+                    f"✅ 已为 {scope_label} 配置付费指令 {command}: {cost:.2f}"
+                )
+            else:
+                yield event.plain_result("❌ 添加失败")
+            return
+
+        if action == "remove":
+            if len(args) < 5:
+                yield event.plain_result("格式: /fc admin paidcmd remove <command> [*]")
+                return
+            command = args[4]
+            scope = raw_group_id
+            if len(args) >= 6 and args[5] == "*":
+                scope = service.GLOBAL_GROUP
+            ok = service.remove_paid_command(scope, command)
+            if ok:
+                yield event.plain_result(f"✅ 已移除付费指令 {command}")
+            else:
+                yield event.plain_result(f"❌ 未找到 {command}")
+            return
+
+        if action in ("toggle", "enable", "disable"):
+            if len(args) < 5:
+                yield event.plain_result("格式: /fc admin paidcmd toggle <command>")
+                return
+            command = args[4]
+            scope = raw_group_id
+            if len(args) >= 6 and args[5] == "*":
+                scope = service.GLOBAL_GROUP
+            enabled = action != "disable"
+            ok = service.toggle_paid_command(scope, command, enabled)
+            if ok:
+                state = "启用" if enabled else "禁用"
+                yield event.plain_result(f"✅ 已{state}付费指令 {command}")
+            else:
+                yield event.plain_result(f"❌ 未找到 {command}")
+            return
+
+        yield event.plain_result(
+            "格式: /fc admin paidcmd <list|scan|add|remove|toggle|enable|disable> ..."
+        )
 
     async def handle_rank(self, event, args, raw_group_id, group_id, user_id, user_name):
         """财富排行榜（普通用户和管理员均可调用）"""
@@ -381,5 +498,11 @@ class AdminHandler:
             "  /fc admin goods setprice <物资ID> <价格>  设置价格",
             "  /fc admin goods setvolatility <物资ID> <波动率>",
             "  /fc admin goods reset                     重置物资价格至基准价",
+            "  /fc admin paidcmd list                    查看本群付费指令配置",
+            "  /fc admin paidcmd scan                    列出可被拦截的其他插件命令",
+            "  /fc admin paidcmd add <cmd> <cost> [描述]  配置付费指令(本群)",
+            "  /fc admin paidcmd add *:<cmd> <cost>      配置全局付费指令",
+            "  /fc admin paidcmd remove <cmd> [*]        移除付费指令",
+            "  /fc admin paidcmd toggle <cmd> [*]        启停付费指令",
         ]
         return "\n".join(lines)

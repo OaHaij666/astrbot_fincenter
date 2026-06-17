@@ -1,5 +1,5 @@
 """聊天奖励服务。"""
-from ..core.database import ChatRewardState, UserAccount, get_china_time
+from src.core.database import ChatRewardState, UserAccount, get_china_time
 
 
 class ChatRewardService:
