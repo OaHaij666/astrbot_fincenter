@@ -153,14 +153,24 @@ class StockMarket:
 
             with self.db.session_scope() as session:
                 now = get_china_time()
+                existing_rows = {
+                    row.code.upper(): row
+                    for row in session.query(StockCompany).filter_by(group_id=group_id).all()
+                    if row.code
+                }
+                config_rows = {}
                 for comp_cfg in self.companies_config:
                     code = comp_cfg.get("code", "").upper()
-                    if not code:
-                        continue
+                    if code:
+                        config_rows[code] = comp_cfg
+                codes = list(config_rows.keys())
+                for code in existing_rows:
+                    if code not in config_rows:
+                        codes.append(code)
 
-                    existing = session.query(StockCompany).filter_by(
-                        group_id=group_id, code=code
-                    ).first()
+                for code in codes:
+                    comp_cfg = config_rows.get(code, {})
+                    existing = existing_rows.get(code)
                     if existing:
                         price = float(existing.current_price)
                         trend = int(existing.trend_level or 0)
