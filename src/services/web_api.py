@@ -12,11 +12,14 @@ from quart import jsonify, request
 from src.core.database import (
     GoodsDefinition,
     GoodsMarketPrice,
+    MarketGroupBinding,
+    PaidCommand,
     StockCompany,
     StockEventState,
     StockHistory,
     StockHolding,
     StockNews,
+    UserAccount,
     UserBackpack,
     get_china_time,
 )
@@ -34,6 +37,7 @@ class FinCenterWebApi:
             admin = f"/{name}/admin"
             routes = [
                 ("/overview", self.get_overview, ["GET"], "FinCenter 总览"),
+                ("/options", self.get_options, ["GET"], "读取 FinCenter 可选项"),
                 ("/settings", self.get_settings, ["GET"], "读取 FinCenter 设置"),
                 ("/settings", self.save_settings, ["POST"], "保存 FinCenter 设置"),
                 ("/binding", self.set_binding, ["POST"], "设置模块分组绑定"),
@@ -122,6 +126,11 @@ class FinCenterWebApi:
             return True, physical_group_id
         return getter(physical_group_id)
 
+    @staticmethod
+    def _sorted_values(values) -> list[str]:
+        cleaned = {str(v).strip() for v in values if str(v or "").strip()}
+        return sorted(cleaned, key=lambda x: (x.startswith("__"), x.lower()))
+
     def _set_raw_config_value(self, section: str, key: str, value):
         data = self.plugin._raw_config.setdefault(section, {})
         if isinstance(data, dict):
@@ -152,6 +161,76 @@ class FinCenterWebApi:
                 "name": self.plugin.config.currency.currency_name,
                 "icon": self.plugin.config.currency.currency_icon,
             },
+        })
+
+    async def get_options(self):
+        goods_group_id = self._clean_id(request.args.get("goods_group_id", ""))
+        stock_group_id = self._clean_id(request.args.get("stock_group_id", ""))
+        paid_group_id = self._clean_id(request.args.get("paid_group_id", ""))
+
+        physical_groups = set()
+        stock_groups = set()
+        goods_groups = set()
+        paid_groups = {self.plugin.paid_command_service.GLOBAL_GROUP}
+        goods_ids = set()
+        stock_codes = set()
+        paid_commands = set()
+
+        with self.plugin.db.session_scope() as session:
+            for row in session.query(MarketGroupBinding).all():
+                physical_groups.add(row.physical_group_id)
+                if row.module == "stock":
+                    stock_groups.add(row.market_group_id)
+                elif row.module == "goods":
+                    goods_groups.add(row.market_group_id)
+                elif row.module == "paid":
+                    paid_groups.add(row.market_group_id)
+
+            for row in session.query(UserAccount.group_id).distinct().all():
+                physical_groups.add(row[0])
+
+            for row in session.query(StockCompany.group_id).distinct().all():
+                stock_groups.add(row[0])
+            for row in session.query(GoodsDefinition.group_id).distinct().all():
+                goods_groups.add(row[0])
+            for row in session.query(PaidCommand.group_id).distinct().all():
+                paid_groups.add(row[0])
+
+            if goods_group_id:
+                for row in session.query(GoodsDefinition.goods_id).filter_by(group_id=goods_group_id).distinct().all():
+                    goods_ids.add(row[0])
+            if stock_group_id:
+                for row in session.query(StockCompany.code).filter_by(group_id=stock_group_id).distinct().all():
+                    stock_codes.add(row[0])
+            if paid_group_id:
+                for row in session.query(PaidCommand.command).filter_by(group_id=paid_group_id).distinct().all():
+                    paid_commands.add(row[0])
+
+        for group in getattr(self.plugin.config.paid_cmd, "paid_cmd_groups", []) or []:
+            group_id = self._clean_id(group.get("group_id"))
+            if group_id:
+                paid_groups.add(group_id)
+                if paid_group_id and group_id == paid_group_id:
+                    for cmd in group.get("commands", []) or []:
+                        paid_commands.add(cmd.get("command", ""))
+
+        for item in getattr(self.plugin.config.paid_cmd, "paid_cmd_group_bindings", []) or []:
+            physical_groups.add(item.get("group_id", ""))
+            paid_groups.add(item.get("paid_group_id", ""))
+
+        for comp in getattr(self.plugin.config.stock, "stock_companies", []) or []:
+            if stock_group_id:
+                stock_codes.add(comp.get("code", ""))
+
+        return self._ok({
+            "physical_groups": self._sorted_values(v for v in physical_groups if v not in ("__global__", "__pending__")),
+            "stock_groups": self._sorted_values(stock_groups),
+            "goods_groups": self._sorted_values(goods_groups),
+            "paid_groups": self._sorted_values(paid_groups),
+            "goods_ids": self._sorted_values(goods_ids),
+            "stock_codes": self._sorted_values(stock_codes),
+            "paid_commands": self._sorted_values(paid_commands),
+            "scanned_commands": list_other_plugin_commands(),
         })
 
     async def get_settings(self):
@@ -378,7 +457,31 @@ class FinCenterWebApi:
             "enabled": enabled,
             "goods_group_id": group_id,
             "items": self._list_goods(group_id) if group_id else [],
+            "options": (await self._options_payload(goods_group_id=group_id)),
         })
+
+    async def _options_payload(self, goods_group_id="", stock_group_id="", paid_group_id=""):
+        # 内部复用轻量查询，避免前端每个模块都必须再请求 options。
+        old_args = request.args
+        _ = old_args
+        goods_ids = set()
+        stock_codes = set()
+        paid_commands = set()
+        with self.plugin.db.session_scope() as session:
+            if goods_group_id:
+                for row in session.query(GoodsDefinition.goods_id).filter_by(group_id=goods_group_id).distinct().all():
+                    goods_ids.add(row[0])
+            if stock_group_id:
+                for row in session.query(StockCompany.code).filter_by(group_id=stock_group_id).distinct().all():
+                    stock_codes.add(row[0])
+            if paid_group_id:
+                for row in session.query(PaidCommand.command).filter_by(group_id=paid_group_id).distinct().all():
+                    paid_commands.add(row[0])
+        return {
+            "goods_ids": self._sorted_values(goods_ids),
+            "stock_codes": self._sorted_values(stock_codes),
+            "paid_commands": self._sorted_values(paid_commands),
+        }
 
     def _list_goods(self, group_id: str) -> list[dict]:
         with self.plugin.db.session_scope() as session:
@@ -542,6 +645,7 @@ class FinCenterWebApi:
             "is_open": bool(getattr(self.plugin.stock_market, "is_open", False)) if self.plugin.stock_market else False,
             "manual_override": getattr(self.plugin.stock_market, "manual_override", None) if self.plugin.stock_market else None,
             "companies": self._list_stock_companies(group_id) if group_id else [],
+            "options": (await self._options_payload(stock_group_id=group_id)),
         })
 
     def _list_stock_companies(self, group_id: str) -> list[dict]:
@@ -674,6 +778,7 @@ class FinCenterWebApi:
             "paid_enabled": enabled,
             "paid_group_id": paid_group_id,
             "commands": rows,
+            "options": (await self._options_payload(paid_group_id=paid_group_id)),
             "currency": {
                 "name": self.plugin.config.currency.currency_name,
                 "icon": self.plugin.config.currency.currency_icon,

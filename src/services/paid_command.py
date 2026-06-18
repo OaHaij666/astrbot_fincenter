@@ -38,7 +38,7 @@ class PaidCommandService:
     def _config_paid_commands(self, paid_group_id: str | None = None) -> list[dict]:
         rows = []
         target_groups = {paid_group_id, self.GLOBAL_GROUP} if paid_group_id is not None else None
-        for group in self.config.paid_cmd.paid_cmd_groups or []:
+        for group in getattr(self.config.paid_cmd, "paid_cmd_groups", []) or []:
             group_id = str(group.get("group_id", "")).strip()
             if not group_id:
                 continue

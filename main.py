@@ -148,7 +148,7 @@ class FinCenterPlugin(Star):
             enabled, group_id = self.db.get_market_binding(physical_group_id, "paid")
             if not enabled or group_id != physical_group_id:
                 return enabled, group_id
-        for item in self.config.paid_cmd.paid_cmd_group_bindings:
+        for item in getattr(self.config.paid_cmd, "paid_cmd_group_bindings", []) or []:
             if str(item.get("group_id", "")) == physical_group_id:
                 enabled = item.get("enabled", True)
                 if isinstance(enabled, str):

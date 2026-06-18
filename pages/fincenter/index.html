@@ -61,7 +61,7 @@
     <div class="grid">
       <div>
         <label>群号</label>
-        <input id="physicalGroupId" placeholder="123456789">
+        <input id="physicalGroupId" list="physicalGroupOptions" placeholder="选择或输入群号">
       </div>
       <button id="loadOverview">读取群配置</button>
     </div>
@@ -81,19 +81,19 @@
         <tr>
           <td>股市</td>
           <td><select id="stockBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><input id="stockBindGroup" placeholder="stock group"></td>
+          <td><input id="stockBindGroup" list="stockGroupOptions" placeholder="选择或输入股市组"></td>
           <td><button data-save-binding="stock">保存</button></td>
         </tr>
         <tr>
           <td>物资</td>
           <td><select id="goodsBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><input id="goodsBindGroup" placeholder="goods group"></td>
+          <td><input id="goodsBindGroup" list="goodsGroupOptions" placeholder="选择或输入物资组"></td>
           <td><button data-save-binding="goods">保存</button></td>
         </tr>
         <tr>
           <td>付费</td>
           <td><select id="paidBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><input id="paidBindGroup" placeholder="paid group"></td>
+          <td><input id="paidBindGroup" list="paidGroupOptions" placeholder="选择或输入付费组"></td>
           <td><button data-save-binding="paid">保存</button></td>
         </tr>
       </tbody>
@@ -103,13 +103,13 @@
   <section id="goods">
     <h2>物资组</h2>
     <div class="grid">
-      <div><label>物资组 ID</label><input id="goodsGroupId" placeholder="default"></div>
+      <div><label>物资组 ID</label><input id="goodsGroupId" list="goodsGroupOptions" placeholder="选择或输入物资组"></div>
       <button id="loadGoods">读取物资组</button>
       <button id="resetGoods" class="secondary">重置价格</button>
     </div>
     <h3>商品</h3>
     <div class="grid">
-      <div><label>物资 ID</label><input id="goodsId"></div>
+      <div><label>物资 ID</label><input id="goodsId" list="goodsIdOptions" placeholder="选择或输入物资 ID"></div>
       <div><label>名称</label><input id="goodsName"></div>
       <div><label>图标</label><input id="goodsIcon" value="📦"></div>
       <div><label>基准价</label><input id="goodsBasePrice" type="number" step="0.01" value="10"></div>
@@ -130,7 +130,7 @@
   <section id="stock">
     <h2>股市组</h2>
     <div class="grid">
-      <div><label>股市组 ID</label><input id="stockGroupId" placeholder="default"></div>
+      <div><label>股市组 ID</label><input id="stockGroupId" list="stockGroupOptions" placeholder="选择或输入股市组"></div>
       <button id="loadStock">读取股市组</button>
       <button id="stockOpen" class="ok">开市</button>
       <button id="stockClose" class="danger">休市</button>
@@ -138,7 +138,7 @@
     </div>
     <h3>股票</h3>
     <div class="grid">
-      <div><label>代码</label><input id="stockCode" placeholder="ABC"></div>
+      <div><label>代码</label><input id="stockCode" list="stockCodeOptions" placeholder="选择或输入股票代码"></div>
       <div><label>名称</label><input id="stockName"></div>
       <div><label>图标</label><input id="stockIcon"></div>
       <div><label>当前价</label><input id="stockPrice" type="number" step="0.01" value="100"></div>
@@ -156,13 +156,13 @@
   <section id="paid">
     <h2>付费组</h2>
     <div class="grid">
-      <div><label>付费组 ID</label><input id="paidGroupId" placeholder="default"></div>
+      <div><label>付费组 ID</label><input id="paidGroupId" list="paidGroupOptions" placeholder="选择或输入付费组"></div>
       <button id="loadPaid">读取付费组</button>
       <button id="scanCommands" class="secondary">扫描其他插件命令</button>
     </div>
     <h3>付费命令</h3>
     <div class="grid">
-      <div><label>命令</label><input id="commandName" placeholder="weather"></div>
+      <div><label>命令</label><input id="commandName" list="commandOptions" placeholder="选择或输入命令"></div>
       <div><label>费用</label><input id="commandCost" type="number" step="0.01" value="5"></div>
       <div><label>状态</label><select id="commandEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
       <div class="wide"><label>描述</label><input id="commandDesc" placeholder="查询天气"></div>
@@ -214,6 +214,14 @@
   </section>
 </main>
 
+<datalist id="physicalGroupOptions"></datalist>
+<datalist id="stockGroupOptions"></datalist>
+<datalist id="goodsGroupOptions"></datalist>
+<datalist id="paidGroupOptions"></datalist>
+<datalist id="goodsIdOptions"></datalist>
+<datalist id="stockCodeOptions"></datalist>
+<datalist id="commandOptions"></datalist>
+
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -221,6 +229,7 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 let goodsItems = [];
 let stockCompanies = [];
 let paidCommands = [];
+let scannedCommands = [];
 
 function unwrap(res) {
   if (res && typeof res === "object" && "status" in res && "data" in res) {
@@ -234,6 +243,52 @@ async function apiPost(path, body = {}) { return unwrap(await window.AstrBotPlug
 function setStatus(text) { $("topStatus").textContent = text || ""; }
 function boolVal(id) { return $(id).value === "true"; }
 function numVal(id) { return Number($(id).value || 0); }
+function setDatalist(id, values) {
+  const seen = new Set();
+  $(id).innerHTML = (values || [])
+    .map((v) => String(v ?? "").trim())
+    .filter((v) => v && !seen.has(v) && seen.add(v))
+    .map((v) => `<option value="${esc(v)}"></option>`)
+    .join("");
+}
+function mergeUnique(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const item of list || []) {
+      const value = String(item ?? "").trim();
+      if (value && !seen.has(value)) {
+        seen.add(value);
+        out.push(value);
+      }
+    }
+  }
+  return out;
+}
+function applyOptions(options = {}) {
+  if ("physical_groups" in options) setDatalist("physicalGroupOptions", options.physical_groups);
+  if ("stock_groups" in options) setDatalist("stockGroupOptions", options.stock_groups);
+  if ("goods_groups" in options) setDatalist("goodsGroupOptions", options.goods_groups);
+  if ("paid_groups" in options) setDatalist("paidGroupOptions", options.paid_groups);
+  if ("goods_ids" in options) setDatalist("goodsIdOptions", mergeUnique(options.goods_ids, goodsItems.map((g) => g.goods_id)));
+  if ("stock_codes" in options) setDatalist("stockCodeOptions", mergeUnique(options.stock_codes, stockCompanies.map((s) => s.code)));
+  if ("paid_commands" in options || "scanned_commands" in options) {
+    setDatalist("commandOptions", mergeUnique(
+      options.paid_commands,
+      paidCommands.map((c) => c.command),
+      scannedCommands.map((c) => c.command)
+    ));
+  }
+}
+async function refreshOptions() {
+  const options = await apiGet("admin/options", {
+    goods_group_id: $("goodsGroupId").value.trim(),
+    stock_group_id: $("stockGroupId").value.trim(),
+    paid_group_id: $("paidGroupId").value.trim(),
+  });
+  scannedCommands = options.scanned_commands || scannedCommands;
+  applyOptions(options);
+}
 
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
@@ -241,6 +296,7 @@ function switchTab(name) {
 }
 
 async function loadOverview() {
+  await refreshOptions();
   const groupId = $("physicalGroupId").value.trim();
   const data = await apiGet("admin/overview", { group_id: groupId });
   for (const module of ["stock", "goods", "paid"]) {
@@ -252,6 +308,7 @@ async function loadOverview() {
   $("stockGroupId").value = $("stockBindGroup").value;
   $("paidGroupId").value = $("paidBindGroup").value;
   setStatus(`股市 ${data.modules.stock ? "启用" : "禁用"} / 物资 ${data.modules.goods ? "启用" : "禁用"} / 付费 ${data.modules.paid ? "启用" : "禁用"}`);
+  await refreshOptions();
 }
 
 async function saveBinding(module) {
@@ -264,6 +321,7 @@ async function saveBinding(module) {
   if (module === "stock") $("stockGroupId").value = market_group_id;
   if (module === "paid") $("paidGroupId").value = market_group_id;
   setStatus("绑定已保存");
+  await refreshOptions();
 }
 
 async function setModule(module, enabled) {
@@ -287,8 +345,10 @@ async function loadGoods() {
   const data = await apiGet("admin/goods/config", { goods_group_id });
   $("goodsGroupId").value = data.goods_group_id || goods_group_id;
   goodsItems = data.items || [];
+  applyOptions(data.options || {});
   renderGoods();
   setStatus(`已读取物资组 ${$("goodsGroupId").value}`);
+  await refreshOptions();
 }
 
 function renderGoods() {
@@ -351,11 +411,13 @@ async function saveGoods() {
   });
   await loadGoods();
   setStatus("商品已保存");
+  await refreshOptions();
 }
 
 async function removeGoods(goods_id) {
   await apiPost("admin/goods/item/remove", { goods_group_id: $("goodsGroupId").value.trim(), goods_id });
   await loadGoods();
+  await refreshOptions();
 }
 
 async function resetGoods() {
@@ -368,8 +430,10 @@ async function loadStock() {
   const data = await apiGet("admin/stock/config", { stock_group_id });
   $("stockGroupId").value = data.stock_group_id || stock_group_id;
   stockCompanies = data.companies || [];
+  applyOptions(data.options || {});
   renderStock();
   setStatus(`已读取股市组 ${$("stockGroupId").value}`);
+  await refreshOptions();
 }
 
 function renderStock() {
@@ -421,11 +485,13 @@ async function saveStock() {
   });
   await loadStock();
   setStatus("股票已保存");
+  await refreshOptions();
 }
 
 async function removeStock(code) {
   await apiPost("admin/stock/company/remove", { stock_group_id: $("stockGroupId").value.trim(), code });
   await loadStock();
+  await refreshOptions();
 }
 
 async function setStockMode(mode) {
@@ -438,8 +504,10 @@ async function loadPaid() {
   const data = await apiGet("admin/paid/config", { paid_group_id });
   $("paidGroupId").value = data.paid_group_id || paid_group_id;
   paidCommands = data.commands || [];
+  applyOptions(data.options || {});
   renderPaid();
   setStatus(`已读取付费组 ${$("paidGroupId").value}`);
+  await refreshOptions();
 }
 
 function renderPaid() {
@@ -468,20 +536,25 @@ async function saveCommand() {
     description: $("commandDesc").value.trim(),
   });
   await loadPaid();
+  await refreshOptions();
 }
 
 async function removeCommand(command) {
   await apiPost("admin/paid/command/remove", { paid_group_id: $("paidGroupId").value.trim(), command });
   await loadPaid();
+  await refreshOptions();
 }
 
 async function toggleCommand(command, enabled) {
   await apiPost("admin/paid/command/toggle", { paid_group_id: $("paidGroupId").value.trim(), command, enabled });
   await loadPaid();
+  await refreshOptions();
 }
 
 async function scanCommands() {
   const rows = await apiGet("admin/paid/scan", {});
+  scannedCommands = rows || [];
+  applyOptions({ scanned_commands: scannedCommands });
   $("scanResult").textContent = (rows || []).slice(0, 120).map((r) => `[${r.plugin}] ${r.command}${r.desc ? " - " + r.desc : ""}`).join("\n") || "未发现命令";
 }
 
@@ -599,6 +672,7 @@ window.AstrBotPluginPage.ready().then(() => {
   bind("scanCommands", scanCommands);
   bind("loadSettings", loadSettings);
   bind("saveSettings", saveSettings);
+  refreshOptions().catch(() => {});
   loadSettings().catch(() => {});
 });
 </script>
