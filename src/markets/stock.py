@@ -88,6 +88,7 @@ class StockMarket:
         self.news_generator = StockNewsGenerator(db, news_config) if self.news_enabled else None
 
         self.companies_config = stock_config.stock_companies
+        self.company_params = self._build_company_params(self.companies_config)
         self.is_open = True
         self.manual_override = None
 
@@ -106,6 +107,31 @@ class StockMarket:
         self.update_count = 0
 
         sync_network_time()
+
+    def _build_company_params(self, companies_config):
+        params = {}
+        for comp in companies_config:
+            code = comp.get("code", "").upper()
+            if not code:
+                continue
+            params[code] = {
+                "volatility": self._safe_float(comp.get("volatility"), self.volatility),
+                "liquidity": max(0.1, self._safe_float(comp.get("liquidity"), 1.0)),
+                "news_sensitivity": max(0.1, self._safe_float(comp.get("news_sensitivity"), 1.0)),
+                "max_change": max(0.01, self._safe_float(comp.get("max_change"), 0.08)),
+                "event_max_change": max(0.02, self._safe_float(comp.get("event_max_change"), 0.18)),
+            }
+        return params
+
+    @staticmethod
+    def _safe_float(value, default):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _company_param(self, code, key, default):
+        return self.company_params.get(code, {}).get(key, default)
 
     def _group_dict(self, store, group_id):
         return store.setdefault(str(group_id), {})
@@ -187,12 +213,15 @@ class StockMarket:
         now = get_china_time()
         price = self.prices[group_id][code]
         seed_count = 50
+        volatility = self._company_param(code, "volatility", self.volatility)
+        liquidity = self._company_param(code, "liquidity", 1.0)
         for i in range(seed_count, 0, -1):
             ts = now - timedelta(seconds=i * max(self.update_interval, 60))
             open_p = price
-            high, low, close = self._simulate_intra_period(price, random.gauss(0, self.volatility * 2), self.volatility)
+            seed_change = self._clamp_change(random.gauss(0, volatility * 2), self._company_param(code, "max_change", 0.08))
+            high, low, close = self._simulate_intra_period(price, seed_change, volatility)
             pct = abs(close - open_p) / max(open_p, 0.01)
-            vol = self._simulate_volume(code, pct, 0)
+            vol = self._simulate_volume(code, pct, 0, liquidity=liquidity)
             session.add(StockHistory(
                 group_id=group_id,
                 code=code,
@@ -332,7 +361,8 @@ class StockMarket:
         price = open_price
         high = open_price
         low = open_price
-        step_drift = total_change / steps
+        total_change = max(-0.95, total_change)
+        step_drift = math.log1p(total_change) / steps
         step_vol = volatility / math.sqrt(steps)
         for i in range(steps):
             progress = (i + 1) / steps
@@ -342,19 +372,33 @@ class StockMarket:
             if i > 0:
                 prev_change = (price - open_price) / open_price
                 micro_momentum = prev_change * 0.05 * random.choice([-1, 1])
-            price *= (1 + drift + noise + micro_momentum)
+            price *= math.exp(drift + noise + micro_momentum)
             price = max(0.01, price)
             high = max(high, price)
             low = min(low, price)
         return high, low, price
 
-    def _simulate_volume(self, code, price_change_pct, trend_level):
+    def _simulate_volume(self, code, price_change_pct, trend_level, liquidity=1.0, active_news=False, breakout=False):
         base_volume = random.uniform(VOLUME_BASE_MIN, VOLUME_BASE_MAX)
         volatility_factor = 1.0 + abs(price_change_pct) * VOLUME_VOLATILITY_SENSITIVITY
         abs_trend = abs(trend_level)
         trend_factor = VOLUME_TREND_MULTIPLIER if abs_trend >= 2 else 1.0
+        news_factor = 1.8 if active_news else 1.0
+        breakout_factor = 1.6 if breakout else 1.0
         noise = max(0.3, min(2.5, random.gauss(1.0, 0.15)))
-        return base_volume * volatility_factor * trend_factor * noise
+        return base_volume * volatility_factor * trend_factor * news_factor * breakout_factor * liquidity * noise
+
+    @staticmethod
+    def _clamp_change(change, limit):
+        return max(-limit, min(limit, change))
+
+    def _is_breakout(self, group_id, code, old_price, new_price):
+        tech = self.tech_states.get(group_id, {}).get(code)
+        if not tech:
+            return False
+        crossed_resistance = tech.resistance and old_price < tech.resistance <= new_price
+        crossed_support = tech.support and old_price > tech.support >= new_price
+        return bool(crossed_resistance or crossed_support)
 
     def _apply_technical_adjustment(self, group_id, code, price, trend_level):
         if not self.tech_enabled:
@@ -461,21 +505,36 @@ class StockMarket:
                 durations[code] = durations.get(code, 0) + 1
                 event_adjustment = 0.0
                 volatility_multiplier = 1.0
-                for ev in active_events_cache.get(code, []):
-                    event_adjustment += 0.005 if ev["trend_shift"] > 0 else (-0.005 if ev["trend_shift"] < 0 else 0)
+                active_events = active_events_cache.get(code, [])
+                news_sensitivity = self._company_param(code, "news_sensitivity", 1.0)
+                for ev in active_events:
+                    remaining = max(1, int(ev.get("remaining_duration", 1)))
+                    decay = min(1.0, remaining / 10.0)
+                    event_adjustment += (0.005 if ev["trend_shift"] > 0 else (-0.005 if ev["trend_shift"] < 0 else 0)) * decay
+                    event_adjustment += float(ev.get("immediate_jump") or 0) * 0.08 * decay
                     volatility_multiplier = max(volatility_multiplier, ev.get("volatility_boost", 1.0))
-                effective_volatility = self.volatility * volatility_multiplier
+                base_volatility = self._company_param(code, "volatility", self.volatility)
+                effective_volatility = base_volatility * volatility_multiplier
                 total_change = (
                     self._calc_trend_change(trend_level, effective_volatility)
                     + self._apply_technical_adjustment(group_id, code, prices[code], trend_level)
-                    + event_adjustment
+                    + event_adjustment * news_sensitivity
                     + self._calc_mean_reversion(group_id, code, prices[code])
                 )
+                change_limit = self._company_param(code, "event_max_change" if active_events else "max_change", 0.18 if active_events else 0.08)
+                total_change = self._clamp_change(total_change, change_limit)
                 open_price = prices[code]
                 high, low, close_price = self._simulate_intra_period(open_price, total_change, effective_volatility)
                 prices[code] = max(0.01, close_price)
                 price_change_pct = (close_price - open_price) / open_price if open_price > 0 else 0
-                sim_volume = self._simulate_volume(code, price_change_pct, trend_level)
+                breakout = self._is_breakout(group_id, code, open_price, prices[code])
+                liquidity = self._company_param(code, "liquidity", 1.0)
+                sim_volume = self._simulate_volume(
+                    code, price_change_pct, trend_level,
+                    liquidity=liquidity,
+                    active_news=bool(active_events),
+                    breakout=breakout,
+                )
                 candle = candles[code]
                 candle["high"] = max(candle["high"], high)
                 candle["low"] = min(candle["low"], low)
@@ -717,9 +776,11 @@ class StockMarket:
         tech = self.tech_states.get(str(group_id), {}).get(code.upper())
         if not tech:
             return None
+        support = [round(float(tech.support), 4)] if tech.support else []
+        resistance = [round(float(tech.resistance), 4)] if tech.resistance else []
         return {
-            "support": tech.support,
-            "resistance": tech.resistance,
+            "support": support,
+            "resistance": resistance,
             "bollinger_upper": tech.bollinger_upper,
             "bollinger_lower": tech.bollinger_lower,
             "bollinger_mid": tech.bollinger_mid,

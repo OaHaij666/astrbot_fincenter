@@ -138,9 +138,9 @@
           "type": "dict"
         },
         "default": [
-          {"code": "ARASAKA", "name": "荒坂集团 Arasaka", "icon": "🏯", "initial_price": 150.0, "description": "日本巨型安保企业财团，从事安保承包、银行和轻重工业制造。全球最具影响力的企业之一，拥有庞大的私人军队和律师团队。与军用科技是死对头。"},
-          {"code": "KANGTAO", "name": "康陶 Kang Tao", "icon": "🎯", "initial_price": 120.0, "description": "中国武器制造商，以智能武器系统闻名。采用陀螺射弹技术发射无壳制导弹药，在智能武器细分市场占据第一。政府背景深厚，是夜之城第四大雇主。"},
-          {"code": "MILITECH", "name": "军用科技 Militech", "icon": "🔫", "initial_price": 130.0, "description": "全球最大武器和军用载具制造商，为新美国政府提供装备。与荒坂是死对头，第四次企业战争的主要参与者。业务涵盖单兵武器、无人机、坦克、飞行器等。"}
+          {"code": "ARASAKA", "name": "荒坂集团 Arasaka", "icon": "🏯", "initial_price": 150.0, "volatility": 0.018, "liquidity": 1.3, "news_sensitivity": 1.0, "max_change": 0.07, "event_max_change": 0.16, "description": "日本巨型安保企业财团，从事安保承包、银行和轻重工业制造。全球最具影响力的企业之一，拥有庞大的私人军队和律师团队。与军用科技是死对头。"},
+          {"code": "KANGTAO", "name": "康陶 Kang Tao", "icon": "🎯", "initial_price": 120.0, "volatility": 0.022, "liquidity": 1.0, "news_sensitivity": 1.15, "max_change": 0.08, "event_max_change": 0.18, "description": "中国武器制造商，以智能武器系统闻名。采用陀螺射弹技术发射无壳制导弹药，在智能武器细分市场占据第一。政府背景深厚，是夜之城第四大雇主。"},
+          {"code": "MILITECH", "name": "军用科技 Militech", "icon": "🔫", "initial_price": 130.0, "volatility": 0.025, "liquidity": 1.1, "news_sensitivity": 1.25, "max_change": 0.09, "event_max_change": 0.20, "description": "全球最大武器和军用载具制造商，为新美国政府提供装备。与荒坂是死对头，第四次企业战争的主要参与者。业务涵盖单兵武器、无人机、坦克、飞行器等。"}
         ]
       },
       "stock_volatility": {
@@ -334,6 +334,31 @@
           "type": "string"
         },
         "default": ["/"]
+      },
+      "paid_cmd_group_bindings": {
+        "description": "群到付费组的绑定列表。group_id=群号，paid_group_id=付费组ID，enabled=是否启用",
+        "type": "list",
+        "items": {
+          "type": "dict"
+        },
+        "default": [
+          {"group_id": "示例群号", "paid_group_id": "default", "enabled": true}
+        ]
+      },
+      "paid_cmd_groups": {
+        "description": "付费组规则列表。group_id=付费组ID，commands 为收费命令列表",
+        "type": "list",
+        "items": {
+          "type": "dict"
+        },
+        "default": [
+          {
+            "group_id": "default",
+            "commands": [
+              {"command": "weather", "cost": 5.0, "description": "查询天气", "enabled": true}
+            ]
+          }
+        ]
       }
     }
   },

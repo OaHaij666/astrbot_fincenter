@@ -27,6 +27,7 @@ from src.core.database import DB
 from src.services.market_manager import MarketManager
 from src.services.rewards import ChatRewardService
 from src.services.paid_command import PaidCommandService
+from src.services.web_api import FinCenterWebApi
 from src.handlers import AccountHandler, StockHandler, GoodsHandler, AdminHandler
 from src.utils import plotter
 from src.utils.renderer import LocalHtmlRenderer
@@ -45,6 +46,8 @@ class FinCenterPlugin(Star):
         self._setup_database()
         self.reward_service = ChatRewardService(self.db, self.config)
         self.paid_command_service = PaidCommandService(self.db, self.config)
+        self.web_api = FinCenterWebApi(self)
+        self.web_api.register()
         self.local_renderer = LocalHtmlRenderer()
         self._setup_handlers()
         self._setup_markets()
@@ -138,6 +141,20 @@ class FinCenterPlugin(Star):
         if hasattr(self.db, "get_market_binding"):
             return self.db.get_market_binding(physical_group_id, "goods")
         return True, str(physical_group_id)
+
+    def get_paid_binding(self, physical_group_id: str) -> tuple[bool, str]:
+        physical_group_id = str(physical_group_id)
+        if hasattr(self.db, "get_market_binding"):
+            enabled, group_id = self.db.get_market_binding(physical_group_id, "paid")
+            if not enabled or group_id != physical_group_id:
+                return enabled, group_id
+        for item in self.config.paid_cmd.paid_cmd_group_bindings:
+            if str(item.get("group_id", "")) == physical_group_id:
+                enabled = item.get("enabled", True)
+                if isinstance(enabled, str):
+                    enabled = enabled.strip().lower() not in ("0", "false", "no", "off", "禁用", "否")
+                return bool(enabled), str(item.get("paid_group_id") or physical_group_id)
+        return True, physical_group_id
 
     def set_market_binding(self, physical_group_id: str, module: str, market_group_id: str = None, enabled: bool = True):
         if hasattr(self.db, "set_market_binding"):
@@ -282,6 +299,7 @@ class FinCenterPlugin(Star):
         """
         raw_group_id = self._extract_raw_group_id(event)
         group_id = self._resolve_group_id(raw_group_id)
+        paid_enabled, paid_group_id = self.get_paid_binding(raw_group_id)
         user_id = str(event.get_sender_id())
         user_name = self._get_user_name(event)
 
@@ -299,8 +317,16 @@ class FinCenterPlugin(Star):
         if message.startswith(("fc", "/fc", "财富中心", "fincenter")):
             return
 
-        status, reply, record = self.paid_command_service.try_deduct(
-            message, group_id, user_id
+        if not paid_enabled:
+            return
+
+        try_deduct = getattr(self.paid_command_service, "try_deduct", None)
+        if not try_deduct:
+            logger.warning("PaidCommandService 缺少 try_deduct，请确认 src/services/paid_command.py 已更新")
+            return
+
+        status, reply, record = try_deduct(
+            message, paid_group_id, group_id, user_id
         )
         if status == "charged" and record is not None:
             event.set_extra("fc_paid_record", record)
@@ -339,9 +365,9 @@ class FinCenterPlugin(Star):
             cost = record.get("cost", 0)
             currency_icon = self.config.currency.currency_icon
             try:
-                yield event.plain_result(
+                event.set_result(event.plain_result(
                     f"⚠️ 插件调用失败，已退还 {currency_icon}{float(cost):.2f}"
-                )
+                ))
             except Exception:
                 pass
 

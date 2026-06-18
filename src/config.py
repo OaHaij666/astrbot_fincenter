@@ -360,6 +360,8 @@ class PaidCmdConfig:
     paid_cmd_deduct_msg: str = ""
     paid_cmd_ignore_admin: bool = True
     paid_cmd_prefixes: List[str] = field(default_factory=lambda: ["/"])
+    paid_cmd_group_bindings: List[Dict[str, Any]] = field(default_factory=list)
+    paid_cmd_groups: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> PaidCmdConfig:
@@ -377,6 +379,8 @@ class PaidCmdConfig:
             paid_cmd_deduct_msg=str(data.get("paid_cmd_deduct_msg", "")),
             paid_cmd_ignore_admin=_to_bool(data.get("paid_cmd_ignore_admin", True)),
             paid_cmd_prefixes=list(data.get("paid_cmd_prefixes", ["/"])),
+            paid_cmd_group_bindings=list(data.get("paid_cmd_group_bindings", [])),
+            paid_cmd_groups=list(data.get("paid_cmd_groups", [])),
         )
 
 

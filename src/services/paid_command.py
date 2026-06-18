@@ -35,21 +35,58 @@ class PaidCommandService:
         return token[0] if token else None
 
     # ---- 查询/CRUD ----
-    def list_paid_commands(self, group_id: str | None = None) -> list[dict]:
+    def _config_paid_commands(self, paid_group_id: str | None = None) -> list[dict]:
+        rows = []
+        target_groups = {paid_group_id, self.GLOBAL_GROUP} if paid_group_id is not None else None
+        for group in self.config.paid_cmd.paid_cmd_groups or []:
+            group_id = str(group.get("group_id", "")).strip()
+            if not group_id:
+                continue
+            if target_groups is not None and group_id not in target_groups:
+                continue
+            for cmd in group.get("commands", []) or []:
+                command = str(cmd.get("command", "")).strip()
+                if not command:
+                    continue
+                try:
+                    cost = float(cmd.get("cost", self.config.paid_cmd.paid_cmd_default_cost))
+                except (TypeError, ValueError):
+                    cost = float(self.config.paid_cmd.paid_cmd_default_cost)
+                rows.append({
+                    "id": None,
+                    "group_id": group_id,
+                    "command": command,
+                    "cost": cost,
+                    "description": str(cmd.get("description", "")),
+                    "enabled": self._to_bool(cmd.get("enabled", True)),
+                    "source": "config",
+                })
+        return rows
+
+    @staticmethod
+    def _to_bool(value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() not in ("0", "false", "no", "off", "禁用", "否")
+        return bool(value)
+
+    def list_paid_commands(self, paid_group_id: str | None = None) -> list[dict]:
         with self.db.session_scope() as session:
             query = session.query(PaidCommand)
-            if group_id is not None:
-                query = query.filter(PaidCommand.group_id.in_([group_id, self.GLOBAL_GROUP]))
+            if paid_group_id is not None:
+                query = query.filter(PaidCommand.group_id.in_([paid_group_id, self.GLOBAL_GROUP]))
             rows = query.order_by(PaidCommand.group_id, PaidCommand.command).all()
-            return [self._row_to_dict(r) for r in rows]
+            db_rows = [self._row_to_dict(r) for r in rows]
+        return db_rows + self._config_paid_commands(paid_group_id)
 
-    def add_paid_command(self, group_id: str, command: str, cost: float, description: str = "") -> bool:
+    def add_paid_command(self, paid_group_id: str, command: str, cost: float, description: str = "") -> bool:
         command = command.strip()
         if not command or cost < 0:
             return False
         with self.db.session_scope() as session:
             existing = session.query(PaidCommand).filter_by(
-                group_id=group_id, command=command
+                group_id=paid_group_id, command=command
             ).first()
             if existing:
                 existing.cost = cost
@@ -57,7 +94,7 @@ class PaidCommandService:
                 existing.enabled = 1
             else:
                 session.add(PaidCommand(
-                    group_id=group_id,
+                    group_id=paid_group_id,
                     command=command,
                     cost=cost,
                     description=description,
@@ -65,20 +102,20 @@ class PaidCommandService:
                 ))
         return True
 
-    def remove_paid_command(self, group_id: str, command: str) -> bool:
+    def remove_paid_command(self, paid_group_id: str, command: str) -> bool:
         with self.db.session_scope() as session:
             row = session.query(PaidCommand).filter_by(
-                group_id=group_id, command=command
+                group_id=paid_group_id, command=command
             ).first()
             if not row:
                 return False
             session.delete(row)
         return True
 
-    def toggle_paid_command(self, group_id: str, command: str, enabled: bool) -> bool:
+    def toggle_paid_command(self, paid_group_id: str, command: str, enabled: bool) -> bool:
         with self.db.session_scope() as session:
             row = session.query(PaidCommand).filter_by(
-                group_id=group_id, command=command
+                group_id=paid_group_id, command=command
             ).first()
             if not row:
                 return False
@@ -96,7 +133,7 @@ class PaidCommandService:
         }
 
     # ---- 拦截扣费/退款 ----
-    def find_match(self, message: str, group_id: str) -> dict | None:
+    def find_match(self, message: str, paid_group_id: str) -> dict | None:
         """根据消息匹配付费命令记录；优先群级，回退全局 ``*``。"""
         cfg = self.config.paid_cmd
         if not cfg.paid_cmd_enabled:
@@ -107,17 +144,26 @@ class PaidCommandService:
             return None
         with self.db.session_scope() as session:
             row = session.query(PaidCommand).filter_by(
-                group_id=group_id, command=token, enabled=1
+                group_id=paid_group_id, command=token, enabled=1
             ).first()
             if not row:
                 row = session.query(PaidCommand).filter_by(
                     group_id=self.GLOBAL_GROUP, command=token, enabled=1
                 ).first()
             if not row:
+                for cfg_row in self._config_paid_commands(paid_group_id):
+                    if cfg_row["enabled"] and cfg_row["command"] == token:
+                        return cfg_row
                 return None
             return self._row_to_dict(row)
 
-    def try_deduct(self, message: str, account_group_id: str, user_id: str) -> tuple[str, str | None, dict | None]:
+    def try_deduct(
+        self,
+        message: str,
+        paid_group_id: str,
+        account_group_id: str,
+        user_id: str,
+    ) -> tuple[str, str | None, dict | None]:
         """尝试扣费。
 
         Returns:
@@ -136,7 +182,7 @@ class PaidCommandService:
             record:
                 扣费成功时返回扣费记录（含 ``cost``, ``user_id``, ``group_id`` 等）。
         """
-        match = self.find_match(message, account_group_id)
+        match = self.find_match(message, paid_group_id)
         if not match:
             return "miss", None, None
 
@@ -171,6 +217,7 @@ class PaidCommandService:
 
         record = {
             "command": match["command"],
+            "paid_group_id": paid_group_id,
             "cost": cost,
             "account_group_id": account_group_id,
             "user_id": user_id,
@@ -213,5 +260,5 @@ class PaidCommandService:
     # ---- 兼容旧接口 ----
     def check_and_deduct(self, message: str, group_id: str, user_id: str) -> str | None:
         """兼容旧接口：仅返回提示文本，不返回扣费记录。"""
-        _, reply, _ = self.try_deduct(message, group_id, user_id)
+        _, reply, _ = self.try_deduct(message, group_id, group_id, user_id)
         return reply

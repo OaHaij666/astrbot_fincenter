@@ -58,12 +58,13 @@ class AdminHandler:
                     {
                         'section_name': '💴 付费指令',
                         'commands': [
-                            {'cmd': '/fc admin 付费', 'desc': '查看本群付费指令配置'},
-                            {'cmd': '/fc admin 付费 扫描', 'desc': '扫描其他插件命令'},
-                            {'cmd': '/fc admin 付费 添加 <指令> <费用> [描述]', 'desc': '配置付费指令'},
-                            {'cmd': '/fc admin 付费 删除 <指令>', 'desc': '移除付费指令'},
-                            {'cmd': '/fc admin 付费 禁用 <指令>', 'desc': '禁用付费指令'},
-                            {'cmd': '/fc admin 付费 启用 <指令>', 'desc': '启用付费指令'},
+                            {'cmd': '/fc admin paidcmd list', 'desc': '查看当前付费组配置'},
+                            {'cmd': '/fc admin paidcmd group [组ID]', 'desc': '查看/切换本群付费组'},
+                            {'cmd': '/fc admin paidcmd on|off [组ID]', 'desc': '启停本群付费拦截'},
+                            {'cmd': '/fc admin paidcmd scan', 'desc': '扫描其他插件命令'},
+                            {'cmd': '/fc admin paidcmd add <cmd> <cost> [描述]', 'desc': '配置付费指令'},
+                            {'cmd': '/fc admin paidcmd remove <cmd>', 'desc': '移除付费指令'},
+                            {'cmd': '/fc admin paidcmd disable <cmd>', 'desc': '禁用付费指令'},
                         ],
                     },
                 ],
@@ -325,6 +326,7 @@ class AdminHandler:
     async def _handle_paidcmd(self, event, args, raw_group_id, group_id):
         action = args[3] if len(args) >= 4 else None
         service = self.plugin.paid_command_service
+        paid_enabled, paid_group_id = self.plugin.get_paid_binding(raw_group_id)
 
         # 中文别名映射
         action_map = {
@@ -333,26 +335,56 @@ class AdminHandler:
             "扫描": "scan",
             "添加": "add",
             "新增": "add",
+            "分组": "group",
             "删除": "remove",
             "移除": "remove",
             "切换": "toggle",
             "启用": "enable",
             "禁用": "disable",
+            "开启": "on",
+            "关闭": "off",
         }
         action = action_map.get(action, action)
 
+        if action in ("group", "on", "off"):
+            if action == "group" and len(args) >= 5:
+                target_group = args[4]
+                self.plugin.set_market_binding(raw_group_id, "paid", target_group, True)
+                yield event.plain_result(f"✅ 本群付费配置已切换到组: {target_group}")
+                return
+            if action == "on":
+                target_group = args[4] if len(args) >= 5 else raw_group_id
+                self.plugin.set_market_binding(raw_group_id, "paid", target_group, True)
+                yield event.plain_result(f"✅ 本群付费拦截已启用，绑定组: {target_group}")
+                return
+            if action == "off":
+                self.plugin.set_market_binding(raw_group_id, "paid", paid_group_id, False)
+                yield event.plain_result(f"✅ 本群付费拦截已禁用（原组: {paid_group_id}）")
+                return
+            status = "启用" if paid_enabled else "禁用"
+            yield event.plain_result(
+                f"本群付费拦截: {status}\n"
+                f"当前付费组: {paid_group_id}\n\n"
+                "切换: /fc admin paidcmd group <组ID>\n"
+                "启用: /fc admin paidcmd on [组ID]\n"
+                "禁用: /fc admin paidcmd off"
+            )
+            return
+
         if action in (None, "list"):
-            rows = service.list_paid_commands(raw_group_id)
+            rows = service.list_paid_commands(paid_group_id)
             if not rows:
                 yield event.plain_result(
                     "本群暂无付费指令配置\n\n"
-                    "添加: /fc admin 付费 添加 <指令> <费用> [描述]\n"
-                    "扫描: /fc admin 付费 扫描\n"
-                    "示例: /fc admin 付费 添加 天气 5 查天气收费"
+                    f"当前付费组: {paid_group_id}\n"
+                    "添加: /fc admin paidcmd add <cmd> <cost> [描述]\n"
+                    "扫描: /fc admin paidcmd scan\n"
+                    "示例: /fc admin paidcmd add weather 5 查天气收费"
                 )
                 return
             currency_icon = self.plugin.config.currency.currency_icon
-            lines = [f"💴 付费指令配置（{raw_group_id}）", "━━━━━━━━━━━━━━"]
+            status = "启用" if paid_enabled else "禁用"
+            lines = [f"💴 付费指令配置（组: {paid_group_id} / {status}）", "━━━━━━━━━━━━━━"]
             for r in rows:
                 state = "✅" if r["enabled"] else "🚫"
                 scope = "全局" if r["group_id"] == service.GLOBAL_GROUP else r["group_id"]
@@ -381,8 +413,8 @@ class AdminHandler:
         if action == "add":
             if len(args) < 6:
                 yield event.plain_result(
-                    "格式: /fc admin 付费 添加 <指令> <费用> [描述]\n"
-                    "示例: /fc admin 付费 添加 天气 5 查天气"
+                    "格式: /fc admin paidcmd add <cmd> <cost> [描述]\n"
+                    "示例: /fc admin paidcmd add weather 5 查天气"
                 )
                 return
             command = args[4]
@@ -392,13 +424,13 @@ class AdminHandler:
                 yield event.plain_result("费用格式错误")
                 return
             description = " ".join(args[6:]) if len(args) > 6 else ""
-            scope = raw_group_id
+            scope = paid_group_id
             if command.startswith("*:"):
                 scope = service.GLOBAL_GROUP
                 command = command[2:]
             ok = service.add_paid_command(scope, command, cost, description)
             if ok:
-                scope_label = "全局" if scope == service.GLOBAL_GROUP else f"群 {scope}"
+                scope_label = "全局" if scope == service.GLOBAL_GROUP else f"付费组 {scope}"
                 yield event.plain_result(
                     f"✅ 已为 {scope_label} 配置付费指令 {command}: {cost:.2f}"
                 )
@@ -409,12 +441,12 @@ class AdminHandler:
         if action == "remove":
             if len(args) < 5:
                 yield event.plain_result(
-                    "格式: /fc admin 付费 删除 <指令> [*]\n"
-                    "示例: /fc admin 付费 删除 天气"
+                    "格式: /fc admin paidcmd remove <cmd> [*]\n"
+                    "示例: /fc admin paidcmd remove weather"
                 )
                 return
             command = args[4]
-            scope = raw_group_id
+            scope = paid_group_id
             if len(args) >= 6 and args[5] == "*":
                 scope = service.GLOBAL_GROUP
             ok = service.remove_paid_command(scope, command)
@@ -427,12 +459,12 @@ class AdminHandler:
         if action in ("toggle", "enable", "disable"):
             if len(args) < 5:
                 yield event.plain_result(
-                    "格式: /fc admin 付费 切换 <指令> [*]\n"
-                    "示例: /fc admin 付费 禁用 天气"
+                    "格式: /fc admin paidcmd <toggle|enable|disable> <cmd> [*]\n"
+                    "示例: /fc admin paidcmd disable weather"
                 )
                 return
             command = args[4]
-            scope = raw_group_id
+            scope = paid_group_id
             if len(args) >= 6 and args[5] == "*":
                 scope = service.GLOBAL_GROUP
             enabled = action != "disable"
@@ -446,12 +478,14 @@ class AdminHandler:
 
         yield event.plain_result(
             "付费指令管理:\n\n"
-            "/fc admin 付费            查看本群配置\n"
-            "/fc admin 付费 扫描        扫描其他插件\n"
-            "/fc admin 付费 添加 <指令> <费用> [描述]\n"
-            "/fc admin 付费 删除 <指令>\n"
-            "/fc admin 付费 禁用 <指令>\n"
-            "/fc admin 付费 启用 <指令>"
+            "/fc admin paidcmd list\n"
+            "/fc admin paidcmd group [组ID]\n"
+            "/fc admin paidcmd on|off [组ID]\n"
+            "/fc admin paidcmd scan\n"
+            "/fc admin paidcmd add <cmd> <cost> [描述]\n"
+            "/fc admin paidcmd remove <cmd>\n"
+            "/fc admin paidcmd disable <cmd>\n"
+            "/fc admin paidcmd enable <cmd>"
         )
 
     async def handle_rank(self, event, args, raw_group_id, group_id, user_id, user_name):
@@ -531,11 +565,13 @@ class AdminHandler:
             "  /fc admin goods reset                     重置物资价格至基准价",
             "",
             "💴 付费指令:",
-            "  /fc admin 付费                            查看本群付费指令配置",
-            "  /fc admin 付费 扫描                        扫描其他插件命令",
-            "  /fc admin 付费 添加 <指令> <费用> [描述]     配置付费指令",
-            "  /fc admin 付费 删除 <指令>                  移除付费指令",
-            "  /fc admin 付费 禁用 <指令>                  禁用付费指令",
-            "  /fc admin 付费 启用 <指令>                  启用付费指令",
+            "  /fc admin paidcmd list                    查看当前付费组配置",
+            "  /fc admin paidcmd group [组ID]             查看/切换本群付费组",
+            "  /fc admin paidcmd on|off [组ID]            启停本群付费拦截",
+            "  /fc admin paidcmd scan                    扫描其他插件命令",
+            "  /fc admin paidcmd add <cmd> <cost> [描述]  配置付费指令",
+            "  /fc admin paidcmd remove <cmd>             移除付费指令",
+            "  /fc admin paidcmd disable <cmd>            禁用付费指令",
+            "  /fc admin paidcmd enable <cmd>             启用付费指令",
         ]
         return "\n".join(lines)

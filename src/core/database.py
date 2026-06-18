@@ -259,7 +259,7 @@ class MarketGroupBinding(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     physical_group_id = Column(String, nullable=False)
-    module = Column(String, nullable=False)  # stock / goods
+    module = Column(String, nullable=False)  # stock / goods / paid
     market_group_id = Column(String, nullable=False)
     enabled = Column(Integer, default=1)
     updated_at = Column(DateTime, default=get_china_time)
@@ -337,7 +337,7 @@ class DB:
         return self.Session()
 
     def get_market_binding(self, physical_group_id, module):
-        """获取物理群在 stock/goods 模块上的启用状态与市场分组。"""
+        """获取物理群在 stock/goods/paid 模块上的启用状态与分组。"""
         physical_group_id = str(physical_group_id)
         with self.session_scope() as session:
             binding = session.query(MarketGroupBinding).filter_by(
@@ -349,7 +349,7 @@ class DB:
             return bool(binding.enabled), binding.market_group_id or physical_group_id
 
     def set_market_binding(self, physical_group_id, module, market_group_id=None, enabled=True):
-        """设置物理群在 stock/goods 模块上的市场分组绑定。"""
+        """设置物理群在 stock/goods/paid 模块上的分组绑定。"""
         physical_group_id = str(physical_group_id)
         market_group_id = str(market_group_id or physical_group_id).strip()
         with self.session_scope() as session:

@@ -117,31 +117,43 @@ class AccountHandler:
         if goods_enabled and goods_group_id and self.plugin.goods_market:
             backpack = self.plugin.goods_market.get_backpack(goods_group_id, user_id)
 
-        result = plotter.render_account_html(
-            user_name=user_name,
-            balance=balance,
-            total_earned=total_earned,
-            total_spent=total_spent,
-            created_at=created_at,
-            currency_name=currency_name,
-            currency_icon=currency_icon,
-            holdings=holdings,
-            backpack=backpack,
-        )
-        if result:
-            html_content, data = result
-            image_path = await self.plugin._render_image(html_content, data)
-            if image_path:
-                yield event.image_result(image_path)
-                return
+        stock_value = sum(float(h.get('market_value', 0)) for h in holdings)
+        goods_value = sum(float(b.get('total_value', 0)) for b in backpack)
+        total_wealth = balance + stock_value + goods_value
 
-        # 回退纯文本
-        msg = f"""👤 {user_name} 的账户
-━━━━━━━━━━━━━━
-{currency_icon} 余额: {balance:.2f}
-📈 累计获得: {total_earned:.2f}
-📉 累计消费: {total_spent:.2f}
-📅 开户时间: {created_at}"""
+        lines = [
+            f"👤 {user_name} 的账户",
+            "━━━━━━━━━━━━━━",
+            f"{currency_icon} 余额: {balance:.2f}",
+            f"📦 总资产: {total_wealth:.2f}",
+            f"📈 累计获得: {total_earned:.2f}",
+            f"📉 累计消费: {total_spent:.2f}",
+            f"📅 开户时间: {created_at}",
+        ]
+
+        if holdings:
+            lines.append("")
+            lines.append("📊 股票持仓")
+            for h in holdings[:5]:
+                profit = float(h.get('profit', 0))
+                sign = "+" if profit >= 0 else ""
+                lines.append(
+                    f"  {h['code']}: {h['amount']:.2f}股 | 市值 {h['market_value']:.2f} | {sign}{profit:.2f}"
+                )
+            if len(holdings) > 5:
+                lines.append(f"  ... 还有 {len(holdings) - 5} 项")
+
+        if backpack:
+            lines.append("")
+            lines.append("🎒 物资背包")
+            for b in backpack[:6]:
+                lines.append(
+                    f"  {b['icon']} {b['name']}: {b['amount']:.2f} | 市值 {b['total_value']:.2f}"
+                )
+            if len(backpack) > 6:
+                lines.append(f"  ... 还有 {len(backpack) - 6} 项")
+
+        msg = "\n".join(lines)
         yield event.plain_result(msg)
 
     async def handle_sign(self, event, group_id, user_id, user_name):
