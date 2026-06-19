@@ -341,9 +341,7 @@
         "items": {
           "type": "dict"
         },
-        "default": [
-          {"group_id": "示例群号", "paid_group_id": "default", "enabled": true}
-        ]
+        "default": []
       },
       "paid_cmd_groups": {
         "description": "付费组规则列表。group_id=付费组ID，commands 为收费命令列表",

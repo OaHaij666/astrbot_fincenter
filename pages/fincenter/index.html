@@ -8,109 +8,134 @@
     :root {
       color-scheme: light dark;
       font-family: "Microsoft YaHei", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --bg: #eef2f6;
+      --bg: #f3f5f8;
       --surface: #ffffff;
-      --surface-soft: #f7f9fc;
-      --line: #d7dee9;
-      --line-strong: #b9c4d3;
-      --text: #202936;
-      --muted: #66758a;
-      --primary: #1f6feb;
-      --primary-strong: #1659c7;
-      --success: #11845b;
-      --danger: #c0353b;
-      --warning: #a16207;
+      --surface-soft: #f8fafc;
+      --line: #d9e0ea;
+      --line-strong: #b9c4d2;
+      --text: #1f2937;
+      --muted: #65758b;
+      --primary: #2563eb;
+      --primary-strong: #1d4ed8;
+      --success: #14804a;
+      --danger: #c4363d;
+      --warning: #9a6700;
+      --shadow: 0 12px 32px rgba(15, 23, 42, .10);
       --nav: #172033;
-      --nav-text: #dce5f2;
-      --nav-muted: #9aa8bc;
-      --shadow: 0 16px 44px rgba(31, 41, 55, .10);
+      --nav-text: #e7eef8;
+      --nav-muted: #9eacc0;
     }
     [data-theme="dark"] {
       --bg: #10151f;
-      --surface: #171f2d;
+      --surface: #17202d;
       --surface-soft: #111827;
-      --line: #2e3a4d;
-      --line-strong: #40506a;
+      --line: #2d394b;
+      --line-strong: #40516b;
       --text: #e7edf6;
-      --muted: #9ca9bb;
+      --muted: #9aa8bb;
       --primary: #5b9dff;
       --primary-strong: #3d83ea;
-      --success: #2fb67d;
+      --success: #30a46c;
       --danger: #ef686f;
-      --warning: #e4a11b;
+      --warning: #d99a18;
+      --shadow: 0 12px 32px rgba(0, 0, 0, .35);
       --nav: #0b1020;
-      --nav-text: #e4ebf7;
+      --nav-text: #e7eef8;
       --nav-muted: #8997ad;
-      --shadow: 0 16px 44px rgba(0, 0, 0, .35);
     }
     * { box-sizing: border-box; }
     html, body { min-height: 100%; }
     body { margin: 0; background: var(--bg); color: var(--text); }
-    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
-    .sidebar { background: var(--nav); color: var(--nav-text); padding: 22px 16px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
-    .brand { padding: 4px 6px 12px; border-bottom: 1px solid rgba(255,255,255,.12); }
-    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px; background: #2c7be5; color: white; font-weight: 800; margin-bottom: 12px; }
-    .brand-title { font-size: 18px; font-weight: 700; letter-spacing: 0; }
-    .brand-sub { font-size: 12px; color: var(--nav-muted); margin-top: 4px; }
-    .tabs { display: grid; gap: 6px; }
-    .tab { min-height: 40px; border: 0; border-radius: 8px; padding: 0 12px; background: transparent; color: var(--nav-muted); cursor: pointer; text-align: left; font-weight: 600; }
-    .tab.active { background: rgba(255,255,255,.11); color: var(--nav-text); box-shadow: inset 3px 0 0 var(--primary); }
-    .workspace { min-width: 0; padding: 22px 26px 32px; }
-    .topbar { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-    .page-title { display: grid; gap: 4px; }
-    h1 { font-size: 26px; line-height: 1.15; margin: 0; letter-spacing: 0; }
-    h2 { font-size: 18px; line-height: 1.25; margin: 0; }
-    h3 { font-size: 13px; line-height: 1.25; margin: 0; color: var(--muted); font-weight: 700; }
-    .eyebrow { color: var(--muted); font-size: 13px; }
-    .status { min-width: 180px; max-width: 420px; min-height: 34px; display: flex; align-items: center; justify-content: flex-end; text-align: right; font-size: 13px; color: var(--primary); white-space: pre-wrap; }
-    section { display: none; }
-    section.active { display: grid; gap: 18px; }
-    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; }
-    .panel-head { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
-    .panel-title { display: grid; gap: 3px; }
-    .panel-body { padding: 16px; }
-    .split { display: grid; grid-template-columns: minmax(260px, .9fr) minmax(420px, 1.5fr); gap: 18px; align-items: start; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 12px; align-items: end; }
-    .grid.compact { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
-    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; font-weight: 700; }
-    input, textarea, select { width: 100%; min-height: 36px; border: 1px solid var(--line-strong); border-radius: 7px; padding: 7px 9px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; }
-    textarea { min-height: 82px; resize: vertical; }
-    input:focus, textarea:focus, select:focus { outline: 2px solid rgba(31,111,235,.18); border-color: var(--primary); }
-    button { min-height: 36px; border: 0; border-radius: 7px; padding: 0 12px; background: var(--primary); color: white; cursor: pointer; white-space: nowrap; font: inherit; font-size: 13px; font-weight: 700; }
+    button, input, select, textarea { font: inherit; }
+    button { min-height: 34px; border: 0; border-radius: 7px; padding: 0 12px; background: var(--primary); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
     button:hover { background: var(--primary-strong); }
     button.secondary { background: #64748b; }
     button.secondary:hover { background: #526174; }
+    button.ghost { background: transparent; color: var(--primary); border: 1px solid var(--line-strong); }
+    button.ghost:hover { background: rgba(37, 99, 235, .08); }
     button.danger { background: var(--danger); }
-    button.danger:hover { background: #a5282e; }
+    button.danger:hover { background: #a92d34; }
     button.ok { background: var(--success); }
-    button.ok:hover { background: #0d6f4d; }
+    button.ok:hover { background: #0f6b3d; }
+    button.icon { width: 34px; padding: 0; display: inline-grid; place-items: center; }
+    input, textarea, select { width: 100%; min-height: 34px; border: 1px solid var(--line-strong); border-radius: 7px; padding: 7px 9px; background: var(--surface); color: var(--text); font-size: 13px; }
+    textarea { min-height: 84px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid rgba(37, 99, 235, .18); border-color: var(--primary); }
+    label { display: block; margin: 0 0 5px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 24px; line-height: 1.2; }
+    h2 { font-size: 17px; line-height: 1.25; }
+    h3 { font-size: 13px; line-height: 1.25; color: var(--muted); }
+
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
+    .sidebar { position: sticky; top: 0; height: 100vh; padding: 20px 14px; background: var(--nav); color: var(--nav-text); display: flex; flex-direction: column; gap: 18px; }
+    .brand { padding: 4px 8px 14px; border-bottom: 1px solid rgba(255,255,255,.12); }
+    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px; background: #2c7be5; font-weight: 800; margin-bottom: 11px; }
+    .brand-title { font-size: 18px; font-weight: 800; }
+    .brand-sub { margin-top: 4px; color: var(--nav-muted); font-size: 12px; }
+    .tabs { display: grid; gap: 6px; }
+    .tab { min-height: 40px; text-align: left; background: transparent; color: var(--nav-muted); }
+    .tab.active { background: rgba(255,255,255,.11); color: var(--nav-text); box-shadow: inset 3px 0 0 var(--primary); }
+
+    .workspace { min-width: 0; padding: 20px 24px 34px; }
+    .topbar { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(360px, 520px); gap: 16px; align-items: start; margin-bottom: 18px; }
+    .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 5px; }
+    .context-card, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+    .context-card { padding: 14px; display: grid; gap: 12px; }
+    .context-grid { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: end; }
+    .binding-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .summary-item { min-height: 58px; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: var(--surface-soft); display: grid; gap: 3px; }
+    .summary-name { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .summary-value { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-line { min-height: 22px; color: var(--primary); font-size: 13px; text-align: right; white-space: pre-wrap; }
+
+    section { display: none; }
+    section.active { display: grid; gap: 16px; }
+    .panel { overflow: hidden; }
+    .panel-head { min-height: 56px; padding: 13px 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+    .panel-title { display: grid; gap: 3px; }
+    .panel-body { padding: 15px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+    .toolbar .field { min-width: 220px; flex: 1 1 260px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+    .grid.wide { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .field-span { grid-column: 1 / -1; }
+    .module-grid { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 14px; }
+    .module-card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 12px; background: var(--surface); }
+    .module-card-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .badge { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: #e8eef7; color: #334155; font-size: 12px; font-weight: 700; }
+    .badge.ok { background: rgba(20,128,74,.12); color: var(--success); }
+    .badge.off { background: rgba(196,54,61,.10); color: var(--danger); }
+    [data-theme="dark"] .badge { background: #253247; color: #dbe6f5; }
     .table-wrap { overflow-x: auto; }
-    table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13px; }
     th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: middle; }
     th { color: var(--muted); font-size: 12px; font-weight: 800; background: var(--surface-soft); }
-    tr:hover td { background: rgba(31,111,235,.04); }
+    tr:hover td { background: rgba(37,99,235,.04); }
     .muted { color: var(--muted); font-size: 13px; }
-    .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: #e8eef7; color: #334155; font-size: 12px; }
-    [data-theme="dark"] .pill { background: #243044; color: #dbe6f5; }
-    .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--surface-soft); }
-    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .picker { display: flex; gap: 6px; align-items: center; }
-    .picker select { min-width: 150px; flex: 1 1 auto; }
-    .picker button { flex: 0 0 auto; padding: 0 10px; }
-    .rename-panel { display: flex; gap: 8px; align-items: end; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px; margin: 0 0 18px; box-shadow: var(--shadow); }
-    .rename-panel[hidden] { display: none; }
-    [data-theme="dark"] .rename-panel { background: #2a1d10; border-color: #854d0e; }
-    .rename-panel .rename-input-wrap { flex: 1 1 240px; }
-    .wide { grid-column: 1 / -1; }
-    @media (max-width: 940px) {
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .thumb { width: 48px; height: 48px; object-fit: cover; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface-soft); }
+    .empty { padding: 24px; text-align: center; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: 8px; background: var(--surface-soft); }
+
+    .popover { position: fixed; z-index: 40; width: min(320px, calc(100vw - 28px)); padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); display: grid; gap: 10px; }
+    .popover-title { font-weight: 800; font-size: 13px; }
+    .popover-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, .38); display: none; align-items: stretch; justify-content: flex-end; }
+    .overlay.show { display: flex; }
+    .drawer { width: min(560px, 100vw); height: 100%; background: var(--surface); box-shadow: -18px 0 44px rgba(15,23,42,.18); display: flex; flex-direction: column; }
+    .drawer-head { min-height: 62px; padding: 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface-soft); }
+    .drawer-body { padding: 16px; overflow: auto; display: grid; gap: 13px; }
+    .drawer-foot { padding: 14px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; background: var(--surface-soft); }
+
+    @media (max-width: 980px) {
       .app-shell { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; padding: 14px; }
       .tabs { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
       .workspace { padding: 16px; }
-      .topbar { align-items: flex-start; flex-direction: column; }
-      .status { justify-content: flex-start; text-align: left; }
-      .split { grid-template-columns: 1fr; }
+      .topbar { grid-template-columns: 1fr; }
+      .context-grid { grid-template-columns: 1fr auto auto; }
+      .binding-summary, .module-grid { grid-template-columns: 1fr; }
+      .status-line { text-align: left; }
     }
   </style>
 </head>
@@ -123,7 +148,7 @@
       <div class="brand-sub">群财富系统控制台</div>
     </div>
     <nav class="tabs">
-      <button class="tab active" data-tab="groups">群绑定</button>
+      <button class="tab active" data-tab="groups">群配置</button>
       <button class="tab" data-tab="goods">物资组</button>
       <button class="tab" data-tab="stock">股市组</button>
       <button class="tab" data-tab="paid">付费组</button>
@@ -133,293 +158,286 @@
 
   <div class="workspace">
     <header class="topbar">
-      <div class="page-title">
+      <div>
         <div class="eyebrow">Administration</div>
-        <h1 id="pageHeading">群绑定</h1>
+        <h1 id="pageHeading">群配置</h1>
       </div>
-      <div id="topStatus" class="status"></div>
+      <div class="context-card">
+        <div class="context-grid">
+          <div>
+            <label>当前群</label>
+            <select id="physicalGroupId"></select>
+          </div>
+          <button id="addPhysicalGroup" class="ghost">新增群</button>
+          <button id="loadOverview">读取</button>
+          <button id="removePhysicalGroup" class="danger">移除绑定</button>
+        </div>
+        <div class="binding-summary">
+          <div class="summary-item"><div class="summary-name">物资</div><div id="goodsSummary" class="summary-value">未读取</div></div>
+          <div class="summary-item"><div class="summary-name">股市</div><div id="stockSummary" class="summary-value">未读取</div></div>
+          <div class="summary-item"><div class="summary-name">付费</div><div id="paidSummary" class="summary-value">未读取</div></div>
+        </div>
+        <div id="topStatus" class="status-line"></div>
+      </div>
     </header>
 
-    <div id="renamePanel" class="rename-panel" hidden>
-      <div class="rename-input-wrap">
-        <label id="renameLabel">重命名</label>
-        <input id="renameInput">
-      </div>
-      <button id="renameApply" class="ok">确认</button>
-      <button id="renameCancel" class="secondary">取消</button>
-    </div>
-
-  <section id="groups" class="active">
-    <div class="split">
+    <section id="groups" class="active">
       <div class="panel">
         <div class="panel-head">
           <div class="panel-title">
-            <h2>群选择</h2>
-            <div class="muted">当前操作群</div>
+            <h2>本群功能绑定</h2>
+            <h3>选择当前群启用哪些模块，以及每个模块使用哪个配置组</h3>
           </div>
-        </div>
-        <div class="panel-body">
-          <label>群号</label>
-          <div class="picker">
-            <select id="physicalGroupId"></select>
-            <button id="addPhysicalGroup" class="secondary">新增</button>
-            <button id="removePhysicalGroup" class="danger">删除</button>
-          </div>
-          <div class="row" style="margin-top:12px">
-            <button id="loadOverview">读取群配置</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">
-            <h2>全局模块</h2>
-            <div class="muted">启停运行时模块</div>
-          </div>
-        </div>
-        <div class="panel-body">
-          <div class="row">
-            <button id="enableStock" class="ok">启用股市模块</button>
-            <button id="disableStock" class="danger">禁用股市模块</button>
-            <button id="enableGoods" class="ok">启用物资模块</button>
-            <button id="disableGoods" class="danger">禁用物资模块</button>
+          <div class="toolbar">
+            <button id="enableStock" class="ok">启用股市服务</button>
+            <button id="disableStock" class="secondary">禁用股市服务</button>
+            <button id="enableGoods" class="ok">启用物资服务</button>
+            <button id="disableGoods" class="secondary">禁用物资服务</button>
             <button id="enablePaid" class="ok">启用付费拦截</button>
-            <button id="disablePaid" class="danger">禁用付费拦截</button>
+            <button id="disablePaid" class="secondary">禁用付费拦截</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="module-grid">
+            <article class="module-card">
+              <div class="module-card-head">
+                <div><h2>物资</h2><div class="muted">商品市场与背包</div></div>
+                <span id="goodsBindBadge" class="badge">未读取</span>
+              </div>
+              <div>
+                <label>本群状态</label>
+                <select id="goodsBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select>
+              </div>
+              <div>
+                <label>物资组</label>
+                <div class="actions">
+                  <select id="goodsBindGroup"></select>
+                  <button class="ghost icon" data-create-select="goodsBindGroup" title="新增物资组">+</button>
+                </div>
+              </div>
+              <button data-save-binding="goods">保存物资绑定</button>
+            </article>
+            <article class="module-card">
+              <div class="module-card-head">
+                <div><h2>股市</h2><div class="muted">股票交易与 K 线</div></div>
+                <span id="stockBindBadge" class="badge">未读取</span>
+              </div>
+              <div>
+                <label>本群状态</label>
+                <select id="stockBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select>
+              </div>
+              <div>
+                <label>股市组</label>
+                <div class="actions">
+                  <select id="stockBindGroup"></select>
+                  <button class="ghost icon" data-create-select="stockBindGroup" title="新增股市组">+</button>
+                </div>
+              </div>
+              <button data-save-binding="stock">保存股市绑定</button>
+            </article>
+            <article class="module-card">
+              <div class="module-card-head">
+                <div><h2>付费</h2><div class="muted">外部插件命令扣费</div></div>
+                <span id="paidBindBadge" class="badge">未读取</span>
+              </div>
+              <div>
+                <label>本群状态</label>
+                <select id="paidBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select>
+              </div>
+              <div>
+                <label>付费组</label>
+                <div class="actions">
+                  <select id="paidBindGroup"></select>
+                  <button class="ghost icon" data-create-select="paidBindGroup" title="新增付费组">+</button>
+                </div>
+              </div>
+              <button data-save-binding="paid">保存付费绑定</button>
+            </article>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>本群绑定</h2>
-          <div class="muted">每个群可绑定不同的股市组、物资组和付费组</div>
+    <section id="goods">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>物资组</h2>
+            <h3>按组维护商品，商品 ID 由程序内部生成</h3>
+          </div>
+          <div class="toolbar">
+            <div class="field">
+              <label>当前物资组</label>
+              <select id="goodsGroupId"></select>
+            </div>
+            <button id="addGoodsGroup" class="ghost">新增物资组</button>
+            <button id="loadGoods">读取</button>
+            <button id="openGoodsCreate" class="ok">新增商品</button>
+            <button id="resetGoods" class="secondary">重置价格</button>
+            <button id="removeGoodsGroup" class="danger">删除物资组</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>展示</th><th>名称</th><th>当前/基准价</th><th>价格区间</th><th>波动率</th><th>操作</th></tr></thead>
+            <tbody id="goodsRows"></tbody>
+          </table>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>模块</th><th>启用</th><th>绑定组</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr>
-              <td>股市</td>
-              <td><select id="stockBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-              <td><div class="picker"><select id="stockBindGroup"></select><button data-add-select="stockBindGroup" class="secondary">新增</button></div></td>
-              <td><button data-save-binding="stock">保存</button></td>
-            </tr>
-            <tr>
-              <td>物资</td>
-              <td><select id="goodsBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-              <td><div class="picker"><select id="goodsBindGroup"></select><button data-add-select="goodsBindGroup" class="secondary">新增</button></div></td>
-              <td><button data-save-binding="goods">保存</button></td>
-            </tr>
-            <tr>
-              <td>付费</td>
-              <td><select id="paidBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-              <td><div class="picker"><select id="paidBindGroup"></select><button data-add-select="paidBindGroup" class="secondary">新增</button></div></td>
-              <td><button data-save-binding="paid">保存</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section id="goods">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>物资组</h2>
-          <div class="muted">商品定义与价格区间</div>
+    <section id="stock">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>股市组</h2>
+            <h3>股票代码会直接用于玩家交易命令</h3>
+          </div>
+          <div class="toolbar">
+            <div class="field">
+              <label>当前股市组</label>
+              <select id="stockGroupId"></select>
+            </div>
+            <button id="addStockGroup" class="ghost">新增股市组</button>
+            <button id="loadStock">读取</button>
+            <button id="openStockCreate" class="ok">新增股票</button>
+            <button id="stockOpen" class="ok">开市</button>
+            <button id="stockClose" class="secondary">休市</button>
+            <button id="stockAuto" class="ghost">自动</button>
+            <button id="removeStockGroup" class="danger">删除股市组</button>
+          </div>
         </div>
-        <div class="row">
-          <button id="loadGoods">读取物资组</button>
-          <button id="resetGoods" class="secondary">重置价格</button>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>代码</th><th>名称</th><th>当前价</th><th>趋势</th><th>描述</th><th>操作</th></tr></thead>
+            <tbody id="stockRows"></tbody>
+          </table>
         </div>
       </div>
-      <div class="panel-body">
-        <div class="grid compact">
-          <div class="wide"><label>物资组 ID</label><div class="picker"><select id="goodsGroupId"></select><button id="addGoodsGroup" class="secondary">新增</button><button id="removeGoodsGroup" class="danger">删除</button></div></div>
-          <div><label>物资 ID</label><div class="picker"><select id="goodsId"></select><button id="addGoodsId" class="secondary">新增</button><button id="removeGoodsId" class="danger">删除</button></div></div>
-          <div><label>名称</label><input id="goodsName"></div>
-          <div><label>图标</label><input id="goodsIcon" value="📦"></div>
-          <div><label>基准价</label><input id="goodsBasePrice" type="number" step="0.01" value="10"></div>
-          <div><label>当前价</label><input id="goodsCurrentPrice" type="number" step="0.01" value="10"></div>
-          <div><label>最低价</label><input id="goodsMinPrice" type="number" step="0.01" value="1"></div>
-          <div><label>最高价</label><input id="goodsMaxPrice" type="number" step="0.01" value="100"></div>
-          <div><label>波动率</label><input id="goodsVolatility" type="number" step="0.01" value="0.1"></div>
-          <div class="wide"><label>图片</label><input id="goodsImage" type="file" accept="image/*"></div>
-          <div class="row wide">
-            <button id="saveGoods" class="ok">保存商品</button>
-            <button id="clearGoodsForm" class="secondary">清空</button>
+    </section>
+
+    <section id="paid">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>付费组</h2>
+            <h3>把其他插件命令加入规则，扣费成功后放行原命令</h3>
+          </div>
+          <div class="toolbar">
+            <div class="field">
+              <label>当前付费组</label>
+              <select id="paidGroupId"></select>
+            </div>
+            <button id="addPaidGroup" class="ghost">新增付费组</button>
+            <button id="loadPaid">读取</button>
+            <button id="openCommandCreate" class="ok">新增规则</button>
+            <button id="scanCommands" class="secondary">扫描命令</button>
+            <button id="removePaidGroup" class="danger">删除付费组</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>命令</th><th>费用</th><th>描述</th><th>状态</th><th>来源</th><th>操作</th></tr></thead>
+            <tbody id="commandRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>扫描结果</h2>
+            <h3>可一键加入当前付费组</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>插件</th><th>命令</th><th>描述</th><th>操作</th></tr></thead>
+            <tbody id="scanRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>基础设置</h2>
+            <h3>全局参数保存后立即应用到当前插件实例</h3>
+          </div>
+          <div class="toolbar">
+            <button id="loadSettings">读取设置</button>
+            <button id="saveSettings" class="ok">保存设置</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="grid wide">
+            <div class="field-span"><label>管理员 ID</label><textarea id="adminIds" placeholder="多个 ID 用逗号、空格或换行分隔"></textarea></div>
+            <div><label>跨群金钱数据</label><select id="crossGroupData"><option value="false">关闭</option><option value="true">开启</option></select></div>
+            <div><label>货币名称</label><input id="currencyName"></div>
+            <div><label>货币图标</label><input id="currencyIcon"></div>
+            <div><label>初始余额</label><input id="initialBalance" type="number" step="0.01"></div>
+            <div><label>开户费用</label><input id="openAccountCost" type="number" step="0.01"></div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>商品列表</h2>
-          <div class="muted">当前物资组</div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>图片</th><th>ID</th><th>名称</th><th>价格</th><th>范围</th><th>波动</th><th>操作</th></tr></thead>
-          <tbody id="goodsRows"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section id="stock">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>股市组</h2>
-          <div class="muted">公司定义与行情状态</div>
-        </div>
-        <div class="row">
-          <button id="loadStock">读取股市组</button>
-          <button id="stockOpen" class="ok">开市</button>
-          <button id="stockClose" class="danger">休市</button>
-          <button id="stockAuto" class="secondary">自动</button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="grid">
-          <div class="wide"><label>股市组 ID</label><div class="picker"><select id="stockGroupId"></select><button id="addStockGroup" class="secondary">新增</button><button id="removeStockGroup" class="danger">删除</button></div></div>
-          <div><label>代码</label><div class="picker"><select id="stockCode"></select><button id="addStockCode" class="secondary">新增</button><button id="removeStockCode" class="danger">删除</button></div></div>
-          <div><label>名称</label><input id="stockName"></div>
-          <div><label>图标</label><input id="stockIcon"></div>
-          <div><label>当前价</label><input id="stockPrice" type="number" step="0.01" value="100"></div>
-          <div><label>趋势级别</label><input id="stockTrend" type="number" min="-3" max="3" step="1" value="0"></div>
-          <div class="wide"><label>描述</label><textarea id="stockDescription"></textarea></div>
-          <div class="row wide">
-            <button id="saveStock" class="ok">保存股票</button>
-            <button id="clearStockForm" class="secondary">清空</button>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title"><h2>奖励与市场参数</h2><h3>签到、发言奖励、股市、物资刷新</h3></div></div>
+        <div class="panel-body">
+          <div class="grid wide">
+            <div><label>签到</label><select id="signinEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+            <div><label>签到基础奖励</label><input id="signinRewardBase" type="number" step="0.01"></div>
+            <div><label>签到随机浮动</label><input id="signinRewardVar" type="number" step="0.01"></div>
+            <div><label>发言奖励</label><select id="chatRewardEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+            <div><label>每条消息奖励</label><input id="chatRewardAmount" type="number" step="0.01"></div>
+            <div><label>发言奖励冷却秒</label><input id="chatRewardCooldown" type="number" step="1"></div>
+            <div><label>股价更新秒</label><input id="stockUpdateInterval" type="number" step="1"></div>
+            <div><label>股市手续费率</label><input id="stockFeeRate" type="number" step="0.0001"></div>
+            <div><label>股市默认波动</label><input id="stockVolatility" type="number" step="0.001"></div>
+            <div><label>限制交易时段</label><select id="stockTradingHours"><option value="false">关闭</option><option value="true">开启</option></select></div>
+            <div><label>K 线柱数</label><input id="stockKlineCandles" type="number" step="1"></div>
+            <div><label>市场新闻</label><select id="stockNewsEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+            <div><label>新闻触发概率</label><input id="stockNewsProb" type="number" step="0.01"></div>
+            <div><label>物资刷新秒</label><input id="goodsRefreshInterval" type="number" step="1"></div>
+            <div><label>物资默认波动</label><input id="goodsPriceVolatility" type="number" step="0.01"></div>
+            <div><label>玩家间交易</label><select id="goodsUserTradeEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+            <div><label>玩家交易税率</label><input id="goodsUserTradeTax" type="number" step="0.01"></div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>股票列表</h2>
-          <div class="muted">当前股市组</div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>代码</th><th>名称</th><th>价格</th><th>趋势</th><th>描述</th><th>操作</th></tr></thead>
-          <tbody id="stockRows"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section id="paid">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>付费组</h2>
-          <div class="muted">外部插件命令扣费规则</div>
-        </div>
-        <div class="row">
-          <button id="loadPaid">读取付费组</button>
-          <button id="scanCommands" class="secondary">扫描其他插件命令</button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="grid">
-          <div class="wide"><label>付费组 ID</label><div class="picker"><select id="paidGroupId"></select><button id="addPaidGroup" class="secondary">新增</button><button id="removePaidGroup" class="danger">删除</button></div></div>
-          <div><label>命令</label><div class="picker"><select id="commandName"></select><button id="addCommandName" class="secondary">新增</button><button id="removeCommandName" class="danger">删除</button></div></div>
-          <div><label>费用</label><input id="commandCost" type="number" step="0.01" value="5"></div>
-          <div><label>状态</label><select id="commandEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-          <div class="wide"><label>描述</label><input id="commandDesc" placeholder="查询天气"></div>
-          <div class="row wide">
-            <button id="saveCommand" class="ok">保存命令</button>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title"><h2>付费与渲染</h2><h3>外部命令扣费默认值和图片渲染策略</h3></div></div>
+        <div class="panel-body">
+          <div class="grid wide">
+            <div><label>付费默认费用</label><input id="paidDefaultCost" type="number" step="0.01"></div>
+            <div><label>管理员免费</label><select id="paidIgnoreAdmin"><option value="true">是</option><option value="false">否</option></select></div>
+            <div><label>付费命令前缀</label><input id="paidPrefixes" placeholder="/, !"></div>
+            <div><label>图片渲染策略</label><select id="renderStrategy"><option value="local">local</option><option value="remote">remote</option></select></div>
+            <div class="field-span"><label>余额不足提示</label><textarea id="paidInsufficientMsg"></textarea></div>
+            <div class="field-span"><label>扣费成功提示</label><textarea id="paidDeductMsg"></textarea></div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>命令列表</h2>
-          <div class="muted">当前付费组</div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>组</th><th>命令</th><th>费用</th><th>描述</th><th>状态</th><th>操作</th></tr></thead>
-          <tbody id="commandRows"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>扫描结果</h2>
-          <div class="muted">可配置为付费的其他插件命令</div>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div id="scanResult" class="muted"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="settings">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">
-          <h2>基础设置</h2>
-          <div class="muted">货币、奖励、市场与付费默认参数</div>
-        </div>
-        <div class="row">
-          <button id="loadSettings">读取设置</button>
-          <button id="saveSettings" class="ok">保存设置</button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="grid">
-          <div class="wide"><label>管理员 ID</label><input id="adminIds" placeholder="多个 ID 用逗号/空格/换行分隔"></div>
-          <div><label>跨群金钱数据</label><select id="crossGroupData"><option value="false">关闭</option><option value="true">开启</option></select></div>
-          <div><label>货币名称</label><input id="currencyName"></div>
-          <div><label>货币图标</label><input id="currencyIcon"></div>
-          <div><label>初始余额</label><input id="initialBalance" type="number" step="0.01"></div>
-          <div><label>开户费用</label><input id="openAccountCost" type="number" step="0.01"></div>
-          <div><label>签到启用</label><select id="signinEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-          <div><label>签到基础奖励</label><input id="signinRewardBase" type="number" step="0.01"></div>
-          <div><label>签到随机奖励</label><input id="signinRewardVar" type="number" step="0.01"></div>
-          <div><label>发言奖励启用</label><select id="chatRewardEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-          <div><label>发言奖励</label><input id="chatRewardAmount" type="number" step="0.01"></div>
-          <div><label>发言冷却秒</label><input id="chatRewardCooldown" type="number" step="1"></div>
-          <div><label>股市更新秒</label><input id="stockUpdateInterval" type="number" step="1"></div>
-          <div><label>股票手续费率</label><input id="stockFeeRate" type="number" step="0.0001"></div>
-          <div><label>股市波动率</label><input id="stockVolatility" type="number" step="0.001"></div>
-          <div><label>交易时间限制</label><select id="stockTradingHours"><option value="false">关闭</option><option value="true">开启</option></select></div>
-          <div><label>K线数量</label><input id="stockKlineCandles" type="number" step="1"></div>
-          <div><label>新闻启用</label><select id="stockNewsEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-          <div><label>新闻触发概率</label><input id="stockNewsProb" type="number" step="0.01"></div>
-          <div><label>物资刷新秒</label><input id="goodsRefreshInterval" type="number" step="1"></div>
-          <div><label>物资默认波动</label><input id="goodsPriceVolatility" type="number" step="0.01"></div>
-          <div><label>用户交易</label><select id="goodsUserTradeEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-          <div><label>用户交易税率</label><input id="goodsUserTradeTax" type="number" step="0.01"></div>
-          <div><label>付费默认费用</label><input id="paidDefaultCost" type="number" step="0.01"></div>
-          <div><label>管理员免费</label><select id="paidIgnoreAdmin"><option value="true">是</option><option value="false">否</option></select></div>
-          <div><label>付费命令前缀</label><input id="paidPrefixes" placeholder="/, !"></div>
-          <div><label>渲染策略</label><select id="renderStrategy"><option value="local">local</option><option value="remote">remote</option></select></div>
-          <div class="wide"><label>余额不足提示</label><textarea id="paidInsufficientMsg"></textarea></div>
-          <div class="wide"><label>扣费提示</label><textarea id="paidDeductMsg"></textarea></div>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
   </div>
 </main>
+
+<div id="drawerOverlay" class="overlay" aria-hidden="true">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div>
+        <h2 id="drawerTitle">编辑</h2>
+        <div id="drawerSub" class="muted"></div>
+      </div>
+      <button id="drawerClose" class="ghost icon" title="关闭">x</button>
+    </div>
+    <div id="drawerBody" class="drawer-body"></div>
+    <div class="drawer-foot">
+      <button id="drawerCancel" class="secondary">取消</button>
+      <button id="drawerSave" class="ok">保存</button>
+    </div>
+  </div>
+</div>
 
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
@@ -429,7 +447,8 @@ let goodsItems = [];
 let stockCompanies = [];
 let paidCommands = [];
 let scannedCommands = [];
-let pendingRename = null;
+let currentDrawer = null;
+let activePopover = null;
 
 function unwrap(res) {
   if (res && typeof res === "object" && "status" in res && "data" in res) {
@@ -443,13 +462,21 @@ async function apiPost(path, body = {}) { return unwrap(await window.AstrBotPlug
 function setStatus(text) { $("topStatus").textContent = text || ""; }
 function boolVal(id) { return $(id).value === "true"; }
 function numVal(id) { return Number($(id).value || 0); }
+function cleanValue(v) { return String(v ?? "").trim(); }
+function isRealOption(v) {
+  v = cleanValue(v);
+  if (!v) return false;
+  const lowered = v.toLowerCase();
+  if (["__global__", "__pending__", "示例群号", "示例", "sample", "example"].includes(v) || ["sample", "example"].includes(lowered)) return false;
+  return !/^(group|goods_group|stock_group|paid_group|goods|stock|command)_\d+$/i.test(v);
+}
 function mergeUnique(...lists) {
   const seen = new Set();
   const out = [];
   for (const list of lists) {
     for (const item of list || []) {
-      const value = String(item ?? "").trim();
-      if (value && !seen.has(value)) {
+      const value = cleanValue(item);
+      if (isRealOption(value) && !seen.has(value)) {
         seen.add(value);
         out.push(value);
       }
@@ -457,220 +484,206 @@ function mergeUnique(...lists) {
   }
   return out;
 }
-function addSelectValue(id, value, selected = true) {
+function setSelectOptions(id, values, keepCurrent = true) {
   const select = $(id);
-  value = String(value ?? "").trim();
-  if (!select || !value) return;
+  if (!select) return;
+  const current = cleanValue(select.value);
+  const options = mergeUnique(values, keepCurrent && current ? [current] : []);
+  select.innerHTML = `<option value="">未选择</option>` + options.map((v) => `<option value="${esc(v)}">${esc(displayGroup(v))}</option>`).join("");
+  if (current && options.includes(current)) select.value = current;
+}
+function addSelectOption(id, value, selected = true) {
+  const select = $(id);
+  value = cleanValue(value);
+  if (!select || !isRealOption(value)) return;
   if (![...select.options].some((opt) => opt.value === value)) {
-    select.insertAdjacentHTML("beforeend", `<option value="${esc(value)}">${esc(value)}</option>`);
+    select.insertAdjacentHTML("beforeend", `<option value="${esc(value)}">${esc(displayGroup(value))}</option>`);
   }
   if (selected) select.value = value;
 }
-function removeSelectValue(id, value) {
+function removeSelectOption(id, value) {
   const select = $(id);
   if (!select) return;
-  [...select.options].forEach((opt) => {
-    if (opt.value === value) opt.remove();
-  });
+  [...select.options].forEach((opt) => { if (opt.value === value) opt.remove(); });
   if (select.value === value) select.value = "";
 }
-function setSelectOptions(id, values) {
-  const select = $(id);
-  if (!select) return;
-  const current = select.value;
-  const options = mergeUnique(values, current ? [current] : []);
-  select.innerHTML = `<option value="">未选择</option>` + options
-    .map((v) => `<option value="${esc(v)}">${esc(v)}</option>`)
-    .join("");
-  if (current && options.includes(current)) select.value = current;
-}
-const sharedSelects = {
+function displayGroup(v) { return v === "*" ? "全局 (*)" : v; }
+const selectGroups = {
   physical: ["physicalGroupId"],
-  stockGroup: ["stockBindGroup", "stockGroupId"],
   goodsGroup: ["goodsBindGroup", "goodsGroupId"],
+  stockGroup: ["stockBindGroup", "stockGroupId"],
   paidGroup: ["paidBindGroup", "paidGroupId"],
-  goodsId: ["goodsId"],
-  stockCode: ["stockCode"],
-  command: ["commandName"],
 };
-function addSharedValue(kind, value, selectedId = null) {
-  for (const id of sharedSelects[kind] || []) addSelectValue(id, value, id === selectedId || !selectedId);
+function addShared(kind, value, selectedId) {
+  for (const id of selectGroups[kind] || []) addSelectOption(id, value, !selectedId || selectedId === id);
 }
-function removeSharedValue(kind, value) {
-  for (const id of sharedSelects[kind] || []) removeSelectValue(id, value);
+function removeShared(kind, value) {
+  for (const id of selectGroups[kind] || []) removeSelectOption(id, value);
 }
-function allSelectValues(kind) {
-  const values = [];
-  for (const id of sharedSelects[kind] || []) {
-    const select = $(id);
-    if (select) values.push(...[...select.options].map((opt) => opt.value));
-  }
-  return values;
-}
-function uniqueTempValue(kind, prefix) {
-  const existing = new Set(allSelectValues(kind));
-  let idx = 1;
-  let value = `${prefix}_${idx}`;
-  while (existing.has(value)) {
-    idx += 1;
-    value = `${prefix}_${idx}`;
-  }
-  return value;
-}
-function hasSelectValue(kind, value, exceptValue = "") {
-  value = String(value || "").trim();
-  if (!value) return false;
-  return allSelectValues(kind).some((v) => v === value && v !== exceptValue);
-}
-function renameSharedValue(kind, oldValue, newValue) {
-  for (const id of sharedSelects[kind] || []) {
-    const select = $(id);
-    if (!select) continue;
-    const wasSelected = select.value === oldValue;
-    [...select.options].forEach((opt) => {
-      if (opt.value === oldValue) {
-        opt.value = newValue;
-        opt.textContent = newValue;
-      }
-    });
-    if (wasSelected) select.value = newValue;
+function updateSummary(module, enabled, groupId) {
+  const text = `${enabled ? "启用" : "禁用"} / ${groupId || "未绑定"}`;
+  $(`${module}Summary`).textContent = text;
+  const badge = $(`${module}BindBadge`);
+  if (badge) {
+    badge.textContent = enabled ? "启用" : "禁用";
+    badge.className = `badge ${enabled ? "ok" : "off"}`;
   }
 }
-function startCreate(kind, label, selectedId, prefix) {
-  if (pendingRename) cancelRename();
-  const value = uniqueTempValue(kind, prefix);
-  addSharedValue(kind, value, selectedId);
-  pendingRename = { kind, selectedId, oldValue: value, created: true };
-  $("renameLabel").textContent = `重命名${label}`;
-  $("renameInput").value = value;
-  $("renamePanel").hidden = false;
-  setStatus(`已创建临时${label}，请重命名后确认`);
-  setTimeout(() => {
-    $("renameInput").focus();
-    $("renameInput").select();
-  }, 0);
-  return value;
+function closePopover() {
+  if (activePopover) {
+    activePopover.remove();
+    activePopover = null;
+  }
 }
-function applyRename() {
-  if (!pendingRename) return;
-  const newValue = $("renameInput").value.trim();
-  const { kind, oldValue } = pendingRename;
-  if (!newValue) {
-    setStatus("名称不能为空");
-    $("renameInput").focus();
-    return;
-  }
-  if (hasSelectValue(kind, newValue, oldValue)) {
-    setStatus("该名称已存在");
-    $("renameInput").focus();
-    $("renameInput").select();
-    return;
-  }
-  renameSharedValue(kind, oldValue, newValue);
-  pendingRename = null;
-  $("renamePanel").hidden = true;
-  setStatus("已重命名，保存后生效");
+function openCreatePopover(anchor, title, placeholder, onConfirm) {
+  closePopover();
+  const pop = document.createElement("div");
+  pop.className = "popover";
+  pop.innerHTML = `
+    <div class="popover-title">${esc(title)}</div>
+    <input data-pop-input placeholder="${esc(placeholder)}">
+    <div class="popover-actions">
+      <button class="secondary" data-pop-cancel>取消</button>
+      <button class="ok" data-pop-ok>确认</button>
+    </div>`;
+  document.body.appendChild(pop);
+  const rect = anchor.getBoundingClientRect();
+  const left = Math.min(rect.left, window.innerWidth - pop.offsetWidth - 14);
+  const top = Math.min(rect.bottom + 8, window.innerHeight - pop.offsetHeight - 14);
+  pop.style.left = `${Math.max(14, left)}px`;
+  pop.style.top = `${Math.max(14, top)}px`;
+  activePopover = pop;
+  const input = pop.querySelector("[data-pop-input]");
+  const confirm = () => {
+    const value = cleanValue(input.value);
+    if (!value) {
+      input.focus();
+      setStatus("名称不能为空");
+      return;
+    }
+    closePopover();
+    onConfirm(value);
+  };
+  pop.querySelector("[data-pop-ok]").onclick = confirm;
+  pop.querySelector("[data-pop-cancel]").onclick = closePopover;
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") confirm();
+    if (e.key === "Escape") closePopover();
+  };
+  setTimeout(() => input.focus(), 0);
 }
-function cancelRename() {
-  if (pendingRename?.created) {
-    removeSharedValue(pendingRename.kind, pendingRename.oldValue);
-  }
-  pendingRename = null;
-  $("renamePanel").hidden = true;
-  setStatus("已取消新增");
+document.addEventListener("click", (e) => {
+  if (!activePopover) return;
+  if (activePopover.contains(e.target) || e.target.closest("[data-create-select], #addPhysicalGroup, #addGoodsGroup, #addStockGroup, #addPaidGroup")) return;
+  closePopover();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePopover(); closeDrawer(); } });
+
+function switchTab(name) {
+  closePopover();
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll("section").forEach((s) => s.classList.toggle("active", s.id === name));
+  const titles = { groups: "群配置", goods: "物资组", stock: "股市组", paid: "付费组", settings: "基础设置" };
+  $("pageHeading").textContent = titles[name] || "FinCenter";
 }
 function applyOptions(options = {}) {
   if ("physical_groups" in options) setSelectOptions("physicalGroupId", options.physical_groups);
-  if ("stock_groups" in options) {
-    setSelectOptions("stockBindGroup", options.stock_groups);
-    setSelectOptions("stockGroupId", options.stock_groups);
-  }
   if ("goods_groups" in options) {
     setSelectOptions("goodsBindGroup", options.goods_groups);
     setSelectOptions("goodsGroupId", options.goods_groups);
+  }
+  if ("stock_groups" in options) {
+    setSelectOptions("stockBindGroup", options.stock_groups);
+    setSelectOptions("stockGroupId", options.stock_groups);
   }
   if ("paid_groups" in options) {
     setSelectOptions("paidBindGroup", options.paid_groups);
     setSelectOptions("paidGroupId", options.paid_groups);
   }
-  if ("goods_ids" in options) setSelectOptions("goodsId", mergeUnique(options.goods_ids, goodsItems.map((g) => g.goods_id)));
-  if ("stock_codes" in options) setSelectOptions("stockCode", mergeUnique(options.stock_codes, stockCompanies.map((s) => s.code)));
-  if ("paid_commands" in options || "scanned_commands" in options) {
-    setSelectOptions("commandName", mergeUnique(
-      options.paid_commands,
-      paidCommands.map((c) => c.command),
-      scannedCommands.map((c) => c.command)
-    ));
-  }
+  if ("scanned_commands" in options) scannedCommands = options.scanned_commands || scannedCommands;
 }
 async function refreshOptions() {
-  const options = await apiGet("admin/options", {
-    goods_group_id: $("goodsGroupId").value.trim(),
-    stock_group_id: $("stockGroupId").value.trim(),
-    paid_group_id: $("paidGroupId").value.trim(),
+  const data = await apiGet("admin/options", {
+    goods_group_id: $("goodsGroupId").value,
+    stock_group_id: $("stockGroupId").value,
+    paid_group_id: $("paidGroupId").value,
   });
-  scannedCommands = options.scanned_commands || scannedCommands;
-  applyOptions(options);
-}
-async function removeCurrentGroup(module, selectId, kind) {
-  const group_id = $(selectId).value;
-  if (!group_id) throw new Error("请先选择要删除的组");
-  if (!window.confirm(`确认删除 ${group_id}？该组下的配置会被清理。`)) return;
-  await apiPost("admin/group/remove", { module, group_id });
-  removeSharedValue(kind, group_id);
-  setStatus("组已删除");
-  await refreshOptions();
-}
-async function removeCurrentPhysicalGroup() {
-  const physical_group_id = $("physicalGroupId").value;
-  if (!physical_group_id) throw new Error("请先选择群号");
-  if (!window.confirm(`确认移除群 ${physical_group_id} 的 FinCenter 绑定？账户数据不会删除。`)) return;
-  await apiPost("admin/binding/remove", { module: "all", physical_group_id });
-  removeSharedValue("physical", physical_group_id);
-  setStatus("群绑定已移除");
-  await refreshOptions();
-}
-
-function switchTab(name) {
-  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  document.querySelectorAll("section").forEach((s) => s.classList.toggle("active", s.id === name));
-  const titles = { groups: "群绑定", goods: "物资组", stock: "股市组", paid: "付费组", settings: "基础设置" };
-  $("pageHeading").textContent = titles[name] || "FinCenter";
+  applyOptions(data);
 }
 
 async function loadOverview() {
   await refreshOptions();
-  const groupId = $("physicalGroupId").value.trim();
+  const groupId = cleanValue($("physicalGroupId").value);
+  if (!groupId) {
+    setStatus("请选择或新增当前群");
+    return;
+  }
   const data = await apiGet("admin/overview", { group_id: groupId });
-  for (const module of ["stock", "goods", "paid"]) {
+  for (const module of ["goods", "stock", "paid"]) {
     const b = data.bindings?.[module] || { enabled: true, group_id: groupId };
     $(`${module}BindEnabled`).value = b.enabled ? "true" : "false";
-    $(`${module}BindGroup`).value = b.group_id || groupId;
+    addSelectOption(`${module}BindGroup`, b.group_id || groupId, true);
+    updateSummary(module, b.enabled, b.group_id || groupId);
   }
   $("goodsGroupId").value = $("goodsBindGroup").value;
   $("stockGroupId").value = $("stockBindGroup").value;
   $("paidGroupId").value = $("paidBindGroup").value;
-  setStatus(`股市 ${data.modules.stock ? "启用" : "禁用"} / 物资 ${data.modules.goods ? "启用" : "禁用"} / 付费 ${data.modules.paid ? "启用" : "禁用"}`);
+  setStatus(`服务状态：股市 ${data.modules.stock ? "启用" : "禁用"} / 物资 ${data.modules.goods ? "启用" : "禁用"} / 付费 ${data.modules.paid ? "启用" : "禁用"}`);
   await refreshOptions();
 }
-
 async function saveBinding(module) {
-  const physical_group_id = $("physicalGroupId").value.trim();
-  if (!physical_group_id) throw new Error("请填写群号");
-  const market_group_id = $(`${module}BindGroup`).value.trim() || physical_group_id;
-  const enabled = $(`${module}BindEnabled`).value === "true";
+  const physical_group_id = cleanValue($("physicalGroupId").value);
+  if (!physical_group_id) throw new Error("请选择或新增当前群");
+  const market_group_id = cleanValue($(`${module}BindGroup`).value) || physical_group_id;
+  const enabled = boolVal(`${module}BindEnabled`);
   await apiPost("admin/binding", { module, physical_group_id, market_group_id, enabled });
-  if (module === "goods") $("goodsGroupId").value = market_group_id;
-  if (module === "stock") $("stockGroupId").value = market_group_id;
-  if (module === "paid") $("paidGroupId").value = market_group_id;
+  addSelectOption(`${module}GroupId`, market_group_id, true);
+  updateSummary(module, enabled, market_group_id);
   setStatus("绑定已保存");
   await refreshOptions();
 }
-
+async function removeCurrentPhysicalGroup() {
+  const physical_group_id = cleanValue($("physicalGroupId").value);
+  if (!physical_group_id) throw new Error("请先选择群号");
+  if (!window.confirm(`确认移除群 ${physical_group_id} 的 FinCenter 绑定？账户数据不会删除。`)) return;
+  await apiPost("admin/binding/remove", { module: "all", physical_group_id });
+  removeShared("physical", physical_group_id);
+  updateSummary("goods", false, "");
+  updateSummary("stock", false, "");
+  updateSummary("paid", false, "");
+  setStatus("群绑定已移除");
+  await refreshOptions();
+}
 async function setModule(module, enabled) {
   const data = await apiPost("admin/module", { module, enabled });
   setStatus(data.message || "模块状态已更新");
   await loadOverview();
+}
+
+function groupKindFromSelect(id) {
+  if (id.startsWith("goods")) return ["goodsGroup", "物资组"];
+  if (id.startsWith("stock")) return ["stockGroup", "股市组"];
+  if (id.startsWith("paid")) return ["paidGroup", "付费组"];
+  return ["physical", "群"];
+}
+function createForSelect(button, selectId) {
+  const [kind, label] = groupKindFromSelect(selectId);
+  openCreatePopover(button, `新增${label}`, `输入${label}名称`, (value) => {
+    addShared(kind, value, selectId);
+    if (kind === "goodsGroup") $("goodsGroupId").value = value;
+    if (kind === "stockGroup") $("stockGroupId").value = value;
+    if (kind === "paidGroup") $("paidGroupId").value = value;
+    setStatus(`${label}已添加到当前页面，保存或新增内容后生效`);
+  });
+}
+async function removeCurrentGroup(module, selectId, kind) {
+  const group_id = cleanValue($(selectId).value);
+  if (!group_id) throw new Error("请先选择要删除的组");
+  if (!window.confirm(`确认删除 ${displayGroup(group_id)}？该组下配置和相关绑定会被清理。`)) return;
+  await apiPost("admin/group/remove", { module, group_id });
+  removeShared(kind, group_id);
+  setStatus("组已删除");
+  await refreshOptions();
 }
 
 function fileToDataUrl(file) {
@@ -682,24 +695,30 @@ function fileToDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
-
+function imageSrc(path) {
+  if (!path) return "";
+  return path.startsWith("file:///") ? path : "file:///" + path.replaceAll("\\", "/");
+}
 async function loadGoods() {
-  const goods_group_id = $("goodsGroupId").value.trim();
+  const goods_group_id = cleanValue($("goodsGroupId").value);
+  if (!goods_group_id) throw new Error("请先选择或新增物资组");
   const data = await apiGet("admin/goods/config", { goods_group_id });
-  $("goodsGroupId").value = data.goods_group_id || goods_group_id;
+  addShared("goodsGroup", data.goods_group_id || goods_group_id, "goodsGroupId");
   goodsItems = data.items || [];
   applyOptions(data.options || {});
   renderGoods();
-  setStatus(`已读取物资组 ${$("goodsGroupId").value}`);
+  setStatus(`已读取物资组 ${displayGroup($("goodsGroupId").value)}`);
   await refreshOptions();
 }
-
 function renderGoods() {
+  if (!goodsItems.length) {
+    $("goodsRows").innerHTML = `<tr><td colspan="6"><div class="empty">当前物资组还没有商品</div></td></tr>`;
+    return;
+  }
   $("goodsRows").innerHTML = goodsItems.map((g) => `
     <tr>
-      <td>${g.preview_image ? `<img class="thumb" src="${esc(g.preview_image.startsWith("file:///") ? g.preview_image : "file:///" + g.preview_image.replaceAll("\\", "/"))}">` : `<span class="pill">${esc(g.icon || "物资")}</span>`}</td>
-      <td>${esc(g.goods_id)}</td>
-      <td>${esc(g.name)}</td>
+      <td>${g.preview_image ? `<img class="thumb" src="${esc(imageSrc(g.preview_image))}">` : `<span class="badge">${esc(g.icon || "物资")}</span>`}</td>
+      <td>${esc(g.icon || "")} ${esc(g.name)}</td>
       <td>${Number(g.current_price || 0).toFixed(2)} / ${Number(g.base_price || 0).toFixed(2)}</td>
       <td>${Number(g.min_price || 0).toFixed(2)} - ${Number(g.max_price || 0).toFixed(2)}</td>
       <td>${Number(g.volatility || 0).toFixed(3)}</td>
@@ -708,50 +727,30 @@ function renderGoods() {
         <button class="danger" data-remove-goods="${esc(g.goods_id)}">删除</button>
       </td>
     </tr>`).join("");
-  document.querySelectorAll("[data-edit-goods]").forEach((b) => b.onclick = () => editGoods(b.dataset.editGoods));
+  document.querySelectorAll("[data-edit-goods]").forEach((b) => b.onclick = () => openGoodsEditor(goodsItems.find((g) => g.goods_id === b.dataset.editGoods)));
   document.querySelectorAll("[data-remove-goods]").forEach((b) => b.onclick = () => removeGoods(b.dataset.removeGoods));
 }
-
-function clearGoodsForm() {
-  $("goodsId").value = "";
-  $("goodsName").value = "";
-  $("goodsIcon").value = "📦";
-  $("goodsBasePrice").value = 10;
-  $("goodsCurrentPrice").value = 10;
-  $("goodsMinPrice").value = 1;
-  $("goodsMaxPrice").value = 100;
-  $("goodsVolatility").value = 0.1;
-  $("goodsImage").value = "";
+function openGoodsEditor(item = null) {
+  openDrawer(item ? "编辑商品" : "新增商品", displayGroup($("goodsGroupId").value), `
+    <input id="goodsEditId" type="hidden" value="${esc(item?.goods_id || "")}">
+    <div class="grid">
+      <div><label>名称</label><input id="goodsName" value="${esc(item?.name || "")}"></div>
+      <div><label>图标</label><input id="goodsIcon" value="${esc(item?.icon || "📦")}"></div>
+      <div><label>基准价</label><input id="goodsBasePrice" type="number" step="0.01" value="${esc(item?.base_price ?? 10)}"></div>
+      <div><label>当前价</label><input id="goodsCurrentPrice" type="number" step="0.01" value="${esc(item?.current_price ?? item?.base_price ?? 10)}"></div>
+      <div><label>最低价</label><input id="goodsMinPrice" type="number" step="0.01" value="${esc(item?.min_price ?? 1)}"></div>
+      <div><label>最高价</label><input id="goodsMaxPrice" type="number" step="0.01" value="${esc(item?.max_price ?? 100)}"></div>
+      <div><label>波动率</label><input id="goodsVolatility" type="number" step="0.01" value="${esc(item?.volatility ?? 0.1)}"></div>
+      <div class="field-span"><label>图片</label><input id="goodsImage" type="file" accept="image/*"></div>
+    </div>`, saveGoods);
 }
-
-function editGoods(id) {
-  const g = goodsItems.find((x) => x.goods_id === id);
-  if (!g) return;
-  $("goodsId").value = g.goods_id;
-  $("goodsName").value = g.name;
-  $("goodsIcon").value = g.icon || "📦";
-  $("goodsBasePrice").value = g.base_price;
-  $("goodsCurrentPrice").value = g.current_price;
-  $("goodsMinPrice").value = g.min_price;
-  $("goodsMaxPrice").value = g.max_price;
-  $("goodsVolatility").value = g.volatility;
-}
-function createGoodsId() {
-  const value = startCreate("goodsId", "物资 ID", "goodsId", "goods");
-  if (value) {
-    $("goodsName").value = "";
-    $("goodsBasePrice").value = 10;
-    $("goodsCurrentPrice").value = 10;
-  }
-}
-
 async function saveGoods() {
   const file = $("goodsImage").files[0];
   await apiPost("admin/goods/item", {
-    goods_group_id: $("goodsGroupId").value.trim(),
-    goods_id: $("goodsId").value.trim(),
-    name: $("goodsName").value.trim(),
-    icon: $("goodsIcon").value.trim() || "📦",
+    goods_group_id: cleanValue($("goodsGroupId").value),
+    goods_id: cleanValue($("goodsEditId").value),
+    name: cleanValue($("goodsName").value),
+    icon: cleanValue($("goodsIcon").value) || "📦",
     base_price: numVal("goodsBasePrice"),
     current_price: numVal("goodsCurrentPrice"),
     min_price: numVal("goodsMinPrice"),
@@ -760,34 +759,40 @@ async function saveGoods() {
     image_name: file?.name || "",
     image_data: await fileToDataUrl(file),
   });
+  closeDrawer();
   await loadGoods();
   setStatus("商品已保存");
-  await refreshOptions();
 }
-
 async function removeGoods(goods_id) {
-  await apiPost("admin/goods/item/remove", { goods_group_id: $("goodsGroupId").value.trim(), goods_id });
+  const item = goodsItems.find((g) => g.goods_id === goods_id);
+  if (!window.confirm(`确认删除商品 ${item?.name || goods_id}？`)) return;
+  await apiPost("admin/goods/item/remove", { goods_group_id: cleanValue($("goodsGroupId").value), goods_id });
   await loadGoods();
-  await refreshOptions();
+  setStatus("商品已删除");
 }
-
 async function resetGoods() {
-  await apiPost("admin/goods/reset", { goods_group_id: $("goodsGroupId").value.trim() });
+  if (!window.confirm("确认把当前物资组所有商品价格重置为基准价？")) return;
+  await apiPost("admin/goods/reset", { goods_group_id: cleanValue($("goodsGroupId").value) });
   await loadGoods();
+  setStatus("价格已重置");
 }
 
 async function loadStock() {
-  const stock_group_id = $("stockGroupId").value.trim();
+  const stock_group_id = cleanValue($("stockGroupId").value);
+  if (!stock_group_id) throw new Error("请先选择或新增股市组");
   const data = await apiGet("admin/stock/config", { stock_group_id });
-  $("stockGroupId").value = data.stock_group_id || stock_group_id;
+  addShared("stockGroup", data.stock_group_id || stock_group_id, "stockGroupId");
   stockCompanies = data.companies || [];
   applyOptions(data.options || {});
   renderStock();
-  setStatus(`已读取股市组 ${$("stockGroupId").value}`);
+  setStatus(`已读取股市组 ${displayGroup($("stockGroupId").value)}`);
   await refreshOptions();
 }
-
 function renderStock() {
+  if (!stockCompanies.length) {
+    $("stockRows").innerHTML = `<tr><td colspan="6"><div class="empty">当前股市组还没有股票</div></td></tr>`;
+    return;
+  }
   $("stockRows").innerHTML = stockCompanies.map((s) => `
     <tr>
       <td>${esc(s.code)}</td>
@@ -800,141 +805,160 @@ function renderStock() {
         <button class="danger" data-remove-stock="${esc(s.code)}">删除</button>
       </td>
     </tr>`).join("");
-  document.querySelectorAll("[data-edit-stock]").forEach((b) => b.onclick = () => editStock(b.dataset.editStock));
+  document.querySelectorAll("[data-edit-stock]").forEach((b) => b.onclick = () => openStockEditor(stockCompanies.find((s) => s.code === b.dataset.editStock)));
   document.querySelectorAll("[data-remove-stock]").forEach((b) => b.onclick = () => removeStock(b.dataset.removeStock));
 }
-
-function clearStockForm() {
-  $("stockCode").value = "";
-  $("stockName").value = "";
-  $("stockIcon").value = "";
-  $("stockPrice").value = 100;
-  $("stockTrend").value = 0;
-  $("stockDescription").value = "";
+function openStockEditor(item = null) {
+  openDrawer(item ? "编辑股票" : "新增股票", displayGroup($("stockGroupId").value), `
+    <div class="grid">
+      <div><label>代码</label><input id="stockCode" value="${esc(item?.code || "")}" ${item ? "readonly" : ""}></div>
+      <div><label>名称</label><input id="stockName" value="${esc(item?.name || "")}"></div>
+      <div><label>图标</label><input id="stockIcon" value="${esc(item?.icon || "")}"></div>
+      <div><label>当前价</label><input id="stockPrice" type="number" step="0.01" value="${esc(item?.current_price ?? 100)}"></div>
+      <div><label>趋势级别</label><input id="stockTrend" type="number" min="-3" max="3" step="1" value="${esc(item?.trend_level ?? 0)}"></div>
+      <div class="field-span"><label>描述</label><textarea id="stockDescription">${esc(item?.description || "")}</textarea></div>
+    </div>`, saveStock);
 }
-
-function editStock(code) {
-  const s = stockCompanies.find((x) => x.code === code);
-  if (!s) return;
-  $("stockCode").value = s.code;
-  $("stockName").value = s.name;
-  $("stockIcon").value = s.icon || "";
-  $("stockPrice").value = s.current_price;
-  $("stockTrend").value = s.trend_level;
-  $("stockDescription").value = s.description || "";
-}
-function createStockCode() {
-  const value = startCreate("stockCode", "股票代码", "stockCode", "stock");
-  if (value) {
-    $("stockName").value = "";
-    $("stockPrice").value = 100;
-    $("stockTrend").value = 0;
-    $("stockDescription").value = "";
-  }
-}
-
 async function saveStock() {
   await apiPost("admin/stock/company", {
-    stock_group_id: $("stockGroupId").value.trim(),
-    code: $("stockCode").value.trim(),
-    name: $("stockName").value.trim(),
-    icon: $("stockIcon").value.trim(),
+    stock_group_id: cleanValue($("stockGroupId").value),
+    code: cleanValue($("stockCode").value),
+    name: cleanValue($("stockName").value),
+    icon: cleanValue($("stockIcon").value),
     current_price: numVal("stockPrice"),
     trend_level: Number($("stockTrend").value || 0),
     description: $("stockDescription").value,
   });
+  closeDrawer();
   await loadStock();
   setStatus("股票已保存");
-  await refreshOptions();
 }
-
 async function removeStock(code) {
-  await apiPost("admin/stock/company/remove", { stock_group_id: $("stockGroupId").value.trim(), code });
+  if (!window.confirm(`确认删除股票 ${code}？相关持仓和历史会被清理。`)) return;
+  await apiPost("admin/stock/company/remove", { stock_group_id: cleanValue($("stockGroupId").value), code });
   await loadStock();
-  await refreshOptions();
+  setStatus("股票已删除");
 }
-
 async function setStockMode(mode) {
   await apiPost("admin/stock/open-state", { mode });
   setStatus("股市状态已更新");
 }
 
 async function loadPaid() {
-  const paid_group_id = $("paidGroupId").value.trim();
+  const paid_group_id = cleanValue($("paidGroupId").value);
+  if (!paid_group_id) throw new Error("请先选择或新增付费组");
   const data = await apiGet("admin/paid/config", { paid_group_id });
-  $("paidGroupId").value = data.paid_group_id || paid_group_id;
+  addShared("paidGroup", data.paid_group_id || paid_group_id, "paidGroupId");
   paidCommands = data.commands || [];
   applyOptions(data.options || {});
   renderPaid();
-  setStatus(`已读取付费组 ${$("paidGroupId").value}`);
+  setStatus(`已读取付费组 ${displayGroup($("paidGroupId").value)}`);
   await refreshOptions();
 }
-
 function renderPaid() {
+  if (!paidCommands.length) {
+    $("commandRows").innerHTML = `<tr><td colspan="6"><div class="empty">当前付费组还没有规则</div></td></tr>`;
+    return;
+  }
   $("commandRows").innerHTML = paidCommands.map((row) => `
     <tr>
-      <td>${esc(row.group_id)}</td>
       <td>${esc(row.command)}</td>
       <td>${Number(row.cost || 0).toFixed(2)}</td>
       <td>${esc(row.description || "")}</td>
       <td>${row.enabled ? "启用" : "禁用"}</td>
+      <td>${esc(row.source || "db")}</td>
       <td class="actions">
+        <button class="secondary" data-edit-command="${esc(row.command)}">编辑</button>
         <button class="secondary" data-toggle-command="${esc(row.command)}" data-enabled="${row.enabled ? "false" : "true"}">${row.enabled ? "禁用" : "启用"}</button>
         <button class="danger" data-remove-command="${esc(row.command)}">删除</button>
       </td>
     </tr>`).join("");
+  document.querySelectorAll("[data-edit-command]").forEach((b) => b.onclick = () => openCommandEditor(paidCommands.find((r) => r.command === b.dataset.editCommand)));
   document.querySelectorAll("[data-toggle-command]").forEach((b) => b.onclick = () => toggleCommand(b.dataset.toggleCommand, b.dataset.enabled === "true"));
   document.querySelectorAll("[data-remove-command]").forEach((b) => b.onclick = () => removeCommand(b.dataset.removeCommand));
 }
-function editCommand(command) {
-  const row = paidCommands.find((x) => x.command === command);
-  const scanned = scannedCommands.find((x) => x.command === command);
-  if (row) {
-    $("commandCost").value = row.cost || 0;
-    $("commandEnabled").value = row.enabled ? "true" : "false";
-    $("commandDesc").value = row.description || "";
-  } else if (scanned) {
-    $("commandDesc").value = scanned.desc || "";
-  }
+function commandOptions(selected = "") {
+  const values = mergeUnique(scannedCommands.map((c) => c.command), paidCommands.map((c) => c.command), selected ? [selected] : []);
+  return `<option value="">手动输入</option>` + values.map((v) => `<option value="${esc(v)}" ${v === selected ? "selected" : ""}>${esc(v)}</option>`).join("");
 }
-function createCommandName() {
-  const value = startCreate("command", "命令", "commandName", "command");
-  if (value) {
-    $("commandCost").value = $("paidDefaultCost").value || 5;
-    $("commandEnabled").value = "true";
-    $("commandDesc").value = "";
-  }
+function openCommandEditor(item = null, editing = !!item) {
+  openDrawer(editing ? "编辑付费规则" : "新增付费规则", displayGroup($("paidGroupId").value), `
+    <div class="grid">
+      <div class="field-span"><label>从扫描结果选择</label><select id="commandPick">${commandOptions(item?.command || "")}</select></div>
+      <div><label>命令</label><input id="commandName" value="${esc(item?.command || "")}" ${editing ? "readonly" : ""}></div>
+      <div><label>费用</label><input id="commandCost" type="number" step="0.01" value="${esc(item?.cost ?? $("paidDefaultCost").value ?? 5)}"></div>
+      <div><label>状态</label><select id="commandEnabled"><option value="true" ${item?.enabled !== false ? "selected" : ""}>启用</option><option value="false" ${item?.enabled === false ? "selected" : ""}>禁用</option></select></div>
+      <div class="field-span"><label>描述</label><input id="commandDesc" value="${esc(item?.description || "")}"></div>
+    </div>`, saveCommand);
+  $("commandPick").onchange = () => {
+    const command = $("commandPick").value;
+    if (!command) return;
+    $("commandName").value = command;
+    const scanned = scannedCommands.find((x) => x.command === command);
+    if (scanned && !$("commandDesc").value) $("commandDesc").value = scanned.desc || "";
+  };
 }
-
 async function saveCommand() {
   await apiPost("admin/paid/command", {
-    paid_group_id: $("paidGroupId").value.trim(),
-    command: $("commandName").value.trim(),
+    paid_group_id: cleanValue($("paidGroupId").value),
+    command: cleanValue($("commandName").value),
     cost: numVal("commandCost"),
     enabled: boolVal("commandEnabled"),
-    description: $("commandDesc").value.trim(),
+    description: cleanValue($("commandDesc").value),
   });
+  closeDrawer();
   await loadPaid();
-  await refreshOptions();
+  setStatus("付费规则已保存");
 }
-
 async function removeCommand(command) {
-  await apiPost("admin/paid/command/remove", { paid_group_id: $("paidGroupId").value.trim(), command });
+  if (!window.confirm(`确认删除付费规则 ${command}？`)) return;
+  await apiPost("admin/paid/command/remove", { paid_group_id: cleanValue($("paidGroupId").value), command });
   await loadPaid();
-  await refreshOptions();
+  setStatus("付费规则已删除");
 }
-
 async function toggleCommand(command, enabled) {
-  await apiPost("admin/paid/command/toggle", { paid_group_id: $("paidGroupId").value.trim(), command, enabled });
+  await apiPost("admin/paid/command/toggle", { paid_group_id: cleanValue($("paidGroupId").value), command, enabled });
   await loadPaid();
-  await refreshOptions();
+  setStatus("付费规则状态已更新");
 }
-
 async function scanCommands() {
   const rows = await apiGet("admin/paid/scan", {});
   scannedCommands = rows || [];
-  applyOptions({ scanned_commands: scannedCommands });
-  $("scanResult").textContent = (rows || []).slice(0, 120).map((r) => `[${r.plugin}] ${r.command}${r.desc ? " - " + r.desc : ""}`).join("\n") || "未发现命令";
+  renderScanRows();
+  setStatus(`扫描到 ${scannedCommands.length} 个命令`);
+}
+function renderScanRows() {
+  if (!scannedCommands.length) {
+    $("scanRows").innerHTML = `<tr><td colspan="4"><div class="empty">尚未扫描，或没有发现其他插件命令</div></td></tr>`;
+    return;
+  }
+  $("scanRows").innerHTML = scannedCommands.slice(0, 160).map((row) => `
+    <tr>
+      <td>${esc(row.plugin || "")}</td>
+      <td>${esc(row.command || "")}</td>
+      <td>${esc(row.desc || "")}</td>
+      <td><button class="ghost" data-add-scanned="${esc(row.command || "")}">加入当前组</button></td>
+    </tr>`).join("");
+  document.querySelectorAll("[data-add-scanned]").forEach((b) => b.onclick = () => {
+    const row = scannedCommands.find((x) => x.command === b.dataset.addScanned);
+    openCommandEditor({ command: row?.command || "", cost: Number($("paidDefaultCost").value || 5), description: row?.desc || "", enabled: true }, false);
+  });
+}
+
+function openDrawer(title, subtitle, html, onSave) {
+  closePopover();
+  currentDrawer = onSave;
+  $("drawerTitle").textContent = title;
+  $("drawerSub").textContent = subtitle || "";
+  $("drawerBody").innerHTML = html;
+  $("drawerOverlay").classList.add("show");
+  $("drawerOverlay").setAttribute("aria-hidden", "false");
+}
+function closeDrawer() {
+  $("drawerOverlay").classList.remove("show");
+  $("drawerOverlay").setAttribute("aria-hidden", "true");
+  $("drawerBody").innerHTML = "";
+  currentDrawer = null;
 }
 
 async function loadSettings() {
@@ -970,13 +994,9 @@ async function loadSettings() {
   $("renderStrategy").value = data.rendering?.render_strategy || "local";
   setStatus("设置已读取");
 }
-
 async function saveSettings() {
   await apiPost("admin/settings", {
-    basic: {
-      admin_ids: $("adminIds").value,
-      cross_group_data: boolVal("crossGroupData"),
-    },
+    basic: { admin_ids: $("adminIds").value, cross_group_data: boolVal("crossGroupData") },
     currency: {
       currency_name: $("currencyName").value,
       currency_icon: $("currencyIcon").value,
@@ -1017,73 +1037,66 @@ async function saveSettings() {
       paid_cmd_insufficient_msg: $("paidInsufficientMsg").value,
       paid_cmd_deduct_msg: $("paidDeductMsg").value,
     },
-    rendering: {
-      render_strategy: $("renderStrategy").value,
-    },
+    rendering: { render_strategy: $("renderStrategy").value },
   });
-  setStatus("设置已保存到当前插件实例");
+  setStatus("设置已保存");
 }
 
-function bind(id, fn) { $(id).onclick = () => Promise.resolve(fn()).catch((e) => setStatus(e.message || String(e))); }
-
+function bind(id, fn) {
+  const el = $(id);
+  if (!el) return;
+  el.onclick = () => Promise.resolve(fn(el)).catch((e) => setStatus(e.message || String(e)));
+}
 window.AstrBotPluginPage.ready().then(() => {
   document.querySelectorAll(".tab").forEach((b) => b.onclick = () => switchTab(b.dataset.tab));
-  bind("loadOverview", loadOverview);
   document.querySelectorAll("[data-save-binding]").forEach((b) => b.onclick = () => saveBinding(b.dataset.saveBinding).catch((e) => setStatus(e.message || String(e))));
-  document.querySelectorAll("[data-add-select]").forEach((b) => {
-    b.onclick = () => {
-      const id = b.dataset.addSelect;
-      const kind = id.startsWith("stock") ? "stockGroup" : (id.startsWith("goods") ? "goodsGroup" : "paidGroup");
-      const label = kind === "stockGroup" ? "股市组" : (kind === "goodsGroup" ? "物资组" : "付费组");
-      const prefix = kind === "stockGroup" ? "stock_group" : (kind === "goodsGroup" ? "goods_group" : "paid_group");
-      startCreate(kind, label, id, prefix);
-    };
-  });
-  bind("renameApply", applyRename);
-  bind("renameCancel", cancelRename);
-  $("renameInput").onkeydown = (e) => {
-    if (e.key === "Enter") applyRename();
-    if (e.key === "Escape") cancelRename();
-  };
-  bind("addPhysicalGroup", () => startCreate("physical", "群号", "physicalGroupId", "group"));
+  document.querySelectorAll("[data-create-select]").forEach((b) => b.onclick = () => createForSelect(b, b.dataset.createSelect));
+  bind("addPhysicalGroup", (button) => openCreatePopover(button, "新增群", "输入群号", (value) => { addShared("physical", value, "physicalGroupId"); setStatus("群已添加到当前页面，请保存模块绑定后生效"); }));
   bind("removePhysicalGroup", removeCurrentPhysicalGroup);
+  bind("loadOverview", loadOverview);
+  $("physicalGroupId").onchange = () => loadOverview().catch((e) => setStatus(e.message || String(e)));
   bind("enableStock", () => setModule("stock", true));
   bind("disableStock", () => setModule("stock", false));
   bind("enableGoods", () => setModule("goods", true));
   bind("disableGoods", () => setModule("goods", false));
   bind("enablePaid", () => setModule("paid", true));
   bind("disablePaid", () => setModule("paid", false));
+
+  bind("addGoodsGroup", (button) => createForSelect(button, "goodsGroupId"));
   bind("loadGoods", loadGoods);
-  bind("addGoodsGroup", () => startCreate("goodsGroup", "物资组", "goodsGroupId", "goods_group"));
-  bind("removeGoodsGroup", () => removeCurrentGroup("goods", "goodsGroupId", "goodsGroup"));
-  bind("addGoodsId", createGoodsId);
-  bind("removeGoodsId", () => removeGoods($("goodsId").value));
-  $("goodsId").onchange = () => editGoods($("goodsId").value);
-  bind("saveGoods", saveGoods);
+  bind("openGoodsCreate", () => openGoodsEditor());
   bind("resetGoods", resetGoods);
-  $("clearGoodsForm").onclick = clearGoodsForm;
+  bind("removeGoodsGroup", () => removeCurrentGroup("goods", "goodsGroupId", "goodsGroup"));
+  $("goodsGroupId").onchange = () => loadGoods().catch((e) => setStatus(e.message || String(e)));
+
+  bind("addStockGroup", (button) => createForSelect(button, "stockGroupId"));
   bind("loadStock", loadStock);
-  bind("addStockGroup", () => startCreate("stockGroup", "股市组", "stockGroupId", "stock_group"));
-  bind("removeStockGroup", () => removeCurrentGroup("stock", "stockGroupId", "stockGroup"));
-  bind("addStockCode", createStockCode);
-  bind("removeStockCode", () => removeStock($("stockCode").value));
-  $("stockCode").onchange = () => editStock($("stockCode").value);
-  bind("saveStock", saveStock);
-  $("clearStockForm").onclick = clearStockForm;
+  bind("openStockCreate", () => openStockEditor());
   bind("stockOpen", () => setStockMode("open"));
   bind("stockClose", () => setStockMode("close"));
   bind("stockAuto", () => setStockMode("auto"));
+  bind("removeStockGroup", () => removeCurrentGroup("stock", "stockGroupId", "stockGroup"));
+  $("stockGroupId").onchange = () => loadStock().catch((e) => setStatus(e.message || String(e)));
+
+  bind("addPaidGroup", (button) => createForSelect(button, "paidGroupId"));
   bind("loadPaid", loadPaid);
-  bind("addPaidGroup", () => startCreate("paidGroup", "付费组", "paidGroupId", "paid_group"));
-  bind("removePaidGroup", () => removeCurrentGroup("paid", "paidGroupId", "paidGroup"));
-  bind("addCommandName", createCommandName);
-  bind("removeCommandName", () => removeCommand($("commandName").value));
-  $("commandName").onchange = () => editCommand($("commandName").value);
-  bind("saveCommand", saveCommand);
+  bind("openCommandCreate", () => openCommandEditor());
   bind("scanCommands", scanCommands);
+  bind("removePaidGroup", () => removeCurrentGroup("paid", "paidGroupId", "paidGroup"));
+  $("paidGroupId").onchange = () => loadPaid().catch((e) => setStatus(e.message || String(e)));
+
   bind("loadSettings", loadSettings);
   bind("saveSettings", saveSettings);
-  refreshOptions().catch(() => {});
+  bind("drawerClose", closeDrawer);
+  bind("drawerCancel", closeDrawer);
+  bind("drawerSave", () => currentDrawer ? currentDrawer() : closeDrawer());
+  $("drawerOverlay").onclick = (e) => { if (e.target === $("drawerOverlay")) closeDrawer(); };
+
+  renderGoods();
+  renderStock();
+  renderPaid();
+  renderScanRows();
+  refreshOptions().catch((e) => setStatus(e.message || String(e)));
   loadSettings().catch(() => {});
 });
 </script>

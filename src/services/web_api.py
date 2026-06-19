@@ -130,8 +130,39 @@ class FinCenterWebApi:
 
     @staticmethod
     def _sorted_values(values) -> list[str]:
-        cleaned = {str(v).strip() for v in values if str(v or "").strip()}
+        cleaned = {
+            str(v).strip()
+            for v in values
+            if FinCenterWebApi._is_real_option_value(v)
+        }
         return sorted(cleaned, key=lambda x: (x.startswith("__"), x.lower()))
+
+    @staticmethod
+    def _is_real_option_value(value) -> bool:
+        value = str(value or "").strip()
+        if not value:
+            return False
+        lowered = value.lower()
+        blocked = {
+            "__global__",
+            "__pending__",
+            "示例群号",
+            "示例",
+            "sample",
+            "example",
+        }
+        if value in blocked or lowered in blocked:
+            return False
+        temp_prefixes = (
+            "group_",
+            "goods_group_",
+            "stock_group_",
+            "paid_group_",
+            "goods_",
+            "stock_",
+            "command_",
+        )
+        return not any(lowered.startswith(prefix) and lowered[len(prefix):].isdigit() for prefix in temp_prefixes)
 
     def _set_raw_config_value(self, section: str, key: str, value):
         data = self.plugin._raw_config.setdefault(section, {})
@@ -612,8 +643,10 @@ class FinCenterWebApi:
         group_id = self._clean_id(body.get("goods_group_id") or body.get("group_id"))
         goods_id = self._clean_id(body.get("goods_id"))
         name = self._clean_id(body.get("name"))
-        if not group_id or not goods_id or not name:
-            return self._err("goods_group_id、goods_id、name 不能为空")
+        if not group_id or not name:
+            return self._err("goods_group_id 和 name 不能为空")
+        if not goods_id:
+            goods_id = self._new_goods_id(group_id)
         base_price = self._to_float(body.get("base_price"), 10.0)
         min_price = self._to_float(body.get("min_price"), base_price * 0.1)
         max_price = self._to_float(body.get("max_price"), base_price * 10.0)
@@ -646,6 +679,18 @@ class FinCenterWebApi:
             market.last_refresh = get_china_time()
 
         return self._ok({"goods_group_id": group_id, "goods_id": goods_id})
+
+    def _new_goods_id(self, group_id: str) -> str:
+        with self.plugin.db.session_scope() as session:
+            for _ in range(12):
+                goods_id = f"goods_{uuid.uuid4().hex[:8]}"
+                exists = session.query(GoodsDefinition).filter_by(
+                    group_id=group_id,
+                    goods_id=goods_id,
+                ).first()
+                if not exists:
+                    return goods_id
+        return f"goods_{uuid.uuid4().hex}"
 
     def _save_goods_image(self, group_id: str, goods_id: str, body: dict) -> str:
         image_data = body.get("image_data")
