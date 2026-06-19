@@ -41,7 +41,9 @@ class FinCenterWebApi:
                 ("/settings", self.get_settings, ["GET"], "读取 FinCenter 设置"),
                 ("/settings", self.save_settings, ["POST"], "保存 FinCenter 设置"),
                 ("/binding", self.set_binding, ["POST"], "设置模块分组绑定"),
+                ("/binding/remove", self.remove_binding, ["POST"], "删除模块分组绑定"),
                 ("/module", self.set_module, ["POST"], "启停模块"),
+                ("/group/remove", self.remove_group, ["POST"], "删除模块组"),
                 ("/goods/config", self.get_goods_config, ["GET"], "读取物资组配置"),
                 ("/goods/item", self.save_goods_item, ["POST"], "保存物资"),
                 ("/goods/item/remove", self.remove_goods_item, ["POST"], "删除物资"),
@@ -429,6 +431,21 @@ class FinCenterWebApi:
         self.plugin.set_market_binding(physical_group_id, module, market_group_id, enabled)
         return self._ok({"module": module, "enabled": enabled, "group_id": market_group_id})
 
+    async def remove_binding(self):
+        body = await self._body()
+        physical_group_id = self._clean_id(body.get("physical_group_id"))
+        module = self._clean_id(body.get("module"))
+        if module not in ("stock", "goods", "paid", "all"):
+            return self._err("module 必须是 stock/goods/paid/all")
+        if not physical_group_id:
+            return self._err("physical_group_id 不能为空")
+        with self.plugin.db.session_scope() as session:
+            query = session.query(MarketGroupBinding).filter_by(physical_group_id=physical_group_id)
+            if module != "all":
+                query = query.filter_by(module=module)
+            count = query.delete()
+        return self._ok({"count": count})
+
     async def set_module(self):
         body = await self._body()
         module = self._clean_id(body.get("module"))
@@ -445,6 +462,92 @@ class FinCenterWebApi:
             return self._err("module 必须是 stock/goods/paid")
         self._persist_raw_config()
         return self._ok({"changed": bool(result[0]), "enabled": enabled}, result[1])
+
+    async def remove_group(self):
+        body = await self._body()
+        module = self._clean_id(body.get("module"))
+        group_id = self._clean_id(body.get("group_id"))
+        if module not in ("stock", "goods", "paid"):
+            return self._err("module 必须是 stock/goods/paid")
+        if not group_id:
+            return self._err("group_id 不能为空")
+        if group_id == self.plugin.paid_command_service.GLOBAL_GROUP:
+            return self._err("全局付费组不能删除")
+
+        if module == "goods":
+            count = self._remove_goods_group(group_id)
+        elif module == "stock":
+            count = self._remove_stock_group(group_id)
+        else:
+            count = self._remove_paid_group(group_id)
+        return self._ok({"count": count})
+
+    def _remove_goods_group(self, group_id: str) -> int:
+        with self.plugin.db.session_scope() as session:
+            goods_ids = [
+                row[0] for row in session.query(GoodsDefinition.goods_id).filter_by(group_id=group_id).all()
+            ]
+        if self.plugin.goods_market:
+            count = 0
+            for goods_id in goods_ids:
+                if self.plugin.goods_market.remove_goods(group_id, goods_id):
+                    count += 1
+            with self.plugin.db.session_scope() as session:
+                session.query(MarketGroupBinding).filter_by(module="goods", market_group_id=group_id).delete()
+            return count
+
+        with self.plugin.db.session_scope() as session:
+            definitions = session.query(GoodsDefinition).filter_by(group_id=group_id).all()
+            image_paths = [d.preview_image for d in definitions if d.preview_image]
+            count = len(definitions)
+            markets = {
+                m.goods_id: float(m.current_price or 0)
+                for m in session.query(GoodsMarketPrice).filter_by(group_id=group_id).all()
+            }
+            backpacks = session.query(UserBackpack).filter_by(group_id=group_id).all()
+            for bp in backpacks:
+                refund = float(bp.amount or 0) * markets.get(bp.goods_id, 0.0)
+                if refund > 0:
+                    user = session.query(UserAccount).filter_by(
+                        group_id=group_id, user_id=bp.user_id
+                    ).first()
+                    if user:
+                        user.add_balance(refund)
+            session.query(GoodsMarketPrice).filter_by(group_id=group_id).delete()
+            session.query(UserBackpack).filter_by(group_id=group_id).delete()
+            session.query(GoodsDefinition).filter_by(group_id=group_id).delete()
+            session.query(MarketGroupBinding).filter_by(module="goods", market_group_id=group_id).delete()
+        for path in image_paths:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+        return count
+
+    def _remove_stock_group(self, group_id: str) -> int:
+        with self.plugin.db.session_scope() as session:
+            count = session.query(StockCompany).filter_by(group_id=group_id).count()
+            session.query(StockHolding).filter_by(group_id=group_id).delete()
+            session.query(StockHistory).filter_by(group_id=group_id).delete()
+            session.query(StockNews).filter_by(group_id=group_id).delete()
+            session.query(StockEventState).filter_by(group_id=group_id).delete()
+            session.query(StockCompany).filter_by(group_id=group_id).delete()
+            session.query(MarketGroupBinding).filter_by(module="stock", market_group_id=group_id).delete()
+        if self.plugin.stock_market:
+            market = self.plugin.stock_market
+            with market.lock:
+                for store in (market.prices, market.trend_levels, market.trend_duration, market.base_prices, market.current_candles, market.tech_states):
+                    store.pop(group_id, None)
+            with market._snapshot_lock:
+                market._price_snapshot.pop(group_id, None)
+        return count
+
+    def _remove_paid_group(self, group_id: str) -> int:
+        with self.plugin.db.session_scope() as session:
+            count = session.query(PaidCommand).filter_by(group_id=group_id).delete()
+            session.query(MarketGroupBinding).filter_by(module="paid", market_group_id=group_id).delete()
+        return count
 
     # ---- 物资组 ----
     async def get_goods_config(self):

@@ -38,6 +38,9 @@
     .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 12px; }
     .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; }
     .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .picker { display: flex; gap: 6px; align-items: center; }
+    .picker select { min-width: 150px; flex: 1 1 auto; }
+    .picker button { flex: 0 0 auto; padding: 0 10px; }
     .wide { grid-column: 1 / -1; }
   </style>
 </head>
@@ -61,7 +64,11 @@
     <div class="grid">
       <div>
         <label>群号</label>
-        <input id="physicalGroupId" list="physicalGroupOptions" placeholder="选择或输入群号">
+        <div class="picker">
+          <select id="physicalGroupId"></select>
+          <button id="addPhysicalGroup" class="secondary">新增</button>
+          <button id="removePhysicalGroup" class="danger">删除</button>
+        </div>
       </div>
       <button id="loadOverview">读取群配置</button>
     </div>
@@ -81,19 +88,19 @@
         <tr>
           <td>股市</td>
           <td><select id="stockBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><input id="stockBindGroup" list="stockGroupOptions" placeholder="选择或输入股市组"></td>
+          <td><div class="picker"><select id="stockBindGroup"></select><button data-add-select="stockBindGroup" class="secondary">新增</button></div></td>
           <td><button data-save-binding="stock">保存</button></td>
         </tr>
         <tr>
           <td>物资</td>
           <td><select id="goodsBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><input id="goodsBindGroup" list="goodsGroupOptions" placeholder="选择或输入物资组"></td>
+          <td><div class="picker"><select id="goodsBindGroup"></select><button data-add-select="goodsBindGroup" class="secondary">新增</button></div></td>
           <td><button data-save-binding="goods">保存</button></td>
         </tr>
         <tr>
           <td>付费</td>
           <td><select id="paidBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><input id="paidBindGroup" list="paidGroupOptions" placeholder="选择或输入付费组"></td>
+          <td><div class="picker"><select id="paidBindGroup"></select><button data-add-select="paidBindGroup" class="secondary">新增</button></div></td>
           <td><button data-save-binding="paid">保存</button></td>
         </tr>
       </tbody>
@@ -103,13 +110,13 @@
   <section id="goods">
     <h2>物资组</h2>
     <div class="grid">
-      <div><label>物资组 ID</label><input id="goodsGroupId" list="goodsGroupOptions" placeholder="选择或输入物资组"></div>
+      <div><label>物资组 ID</label><div class="picker"><select id="goodsGroupId"></select><button id="addGoodsGroup" class="secondary">新增</button><button id="removeGoodsGroup" class="danger">删除</button></div></div>
       <button id="loadGoods">读取物资组</button>
       <button id="resetGoods" class="secondary">重置价格</button>
     </div>
     <h3>商品</h3>
     <div class="grid">
-      <div><label>物资 ID</label><input id="goodsId" list="goodsIdOptions" placeholder="选择或输入物资 ID"></div>
+      <div><label>物资 ID</label><div class="picker"><select id="goodsId"></select><button id="addGoodsId" class="secondary">新增</button><button id="removeGoodsId" class="danger">删除</button></div></div>
       <div><label>名称</label><input id="goodsName"></div>
       <div><label>图标</label><input id="goodsIcon" value="📦"></div>
       <div><label>基准价</label><input id="goodsBasePrice" type="number" step="0.01" value="10"></div>
@@ -130,7 +137,7 @@
   <section id="stock">
     <h2>股市组</h2>
     <div class="grid">
-      <div><label>股市组 ID</label><input id="stockGroupId" list="stockGroupOptions" placeholder="选择或输入股市组"></div>
+      <div><label>股市组 ID</label><div class="picker"><select id="stockGroupId"></select><button id="addStockGroup" class="secondary">新增</button><button id="removeStockGroup" class="danger">删除</button></div></div>
       <button id="loadStock">读取股市组</button>
       <button id="stockOpen" class="ok">开市</button>
       <button id="stockClose" class="danger">休市</button>
@@ -138,7 +145,7 @@
     </div>
     <h3>股票</h3>
     <div class="grid">
-      <div><label>代码</label><input id="stockCode" list="stockCodeOptions" placeholder="选择或输入股票代码"></div>
+      <div><label>代码</label><div class="picker"><select id="stockCode"></select><button id="addStockCode" class="secondary">新增</button><button id="removeStockCode" class="danger">删除</button></div></div>
       <div><label>名称</label><input id="stockName"></div>
       <div><label>图标</label><input id="stockIcon"></div>
       <div><label>当前价</label><input id="stockPrice" type="number" step="0.01" value="100"></div>
@@ -156,13 +163,13 @@
   <section id="paid">
     <h2>付费组</h2>
     <div class="grid">
-      <div><label>付费组 ID</label><input id="paidGroupId" list="paidGroupOptions" placeholder="选择或输入付费组"></div>
+      <div><label>付费组 ID</label><div class="picker"><select id="paidGroupId"></select><button id="addPaidGroup" class="secondary">新增</button><button id="removePaidGroup" class="danger">删除</button></div></div>
       <button id="loadPaid">读取付费组</button>
       <button id="scanCommands" class="secondary">扫描其他插件命令</button>
     </div>
     <h3>付费命令</h3>
     <div class="grid">
-      <div><label>命令</label><input id="commandName" list="commandOptions" placeholder="选择或输入命令"></div>
+      <div><label>命令</label><div class="picker"><select id="commandName"></select><button id="addCommandName" class="secondary">新增</button><button id="removeCommandName" class="danger">删除</button></div></div>
       <div><label>费用</label><input id="commandCost" type="number" step="0.01" value="5"></div>
       <div><label>状态</label><select id="commandEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
       <div class="wide"><label>描述</label><input id="commandDesc" placeholder="查询天气"></div>
@@ -214,14 +221,6 @@
   </section>
 </main>
 
-<datalist id="physicalGroupOptions"></datalist>
-<datalist id="stockGroupOptions"></datalist>
-<datalist id="goodsGroupOptions"></datalist>
-<datalist id="paidGroupOptions"></datalist>
-<datalist id="goodsIdOptions"></datalist>
-<datalist id="stockCodeOptions"></datalist>
-<datalist id="commandOptions"></datalist>
-
 <script src="/api/plugin/page/bridge-sdk.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -243,14 +242,6 @@ async function apiPost(path, body = {}) { return unwrap(await window.AstrBotPlug
 function setStatus(text) { $("topStatus").textContent = text || ""; }
 function boolVal(id) { return $(id).value === "true"; }
 function numVal(id) { return Number($(id).value || 0); }
-function setDatalist(id, values) {
-  const seen = new Set();
-  $(id).innerHTML = (values || [])
-    .map((v) => String(v ?? "").trim())
-    .filter((v) => v && !seen.has(v) && seen.add(v))
-    .map((v) => `<option value="${esc(v)}"></option>`)
-    .join("");
-}
 function mergeUnique(...lists) {
   const seen = new Set();
   const out = [];
@@ -265,15 +256,72 @@ function mergeUnique(...lists) {
   }
   return out;
 }
+function addSelectValue(id, value, selected = true) {
+  const select = $(id);
+  value = String(value ?? "").trim();
+  if (!select || !value) return;
+  if (![...select.options].some((opt) => opt.value === value)) {
+    select.insertAdjacentHTML("beforeend", `<option value="${esc(value)}">${esc(value)}</option>`);
+  }
+  if (selected) select.value = value;
+}
+function removeSelectValue(id, value) {
+  const select = $(id);
+  if (!select) return;
+  [...select.options].forEach((opt) => {
+    if (opt.value === value) opt.remove();
+  });
+  if (select.value === value) select.value = "";
+}
+function setSelectOptions(id, values) {
+  const select = $(id);
+  if (!select) return;
+  const current = select.value;
+  const options = mergeUnique(values, current ? [current] : []);
+  select.innerHTML = `<option value="">未选择</option>` + options
+    .map((v) => `<option value="${esc(v)}">${esc(v)}</option>`)
+    .join("");
+  if (current && options.includes(current)) select.value = current;
+}
+const sharedSelects = {
+  physical: ["physicalGroupId"],
+  stockGroup: ["stockBindGroup", "stockGroupId"],
+  goodsGroup: ["goodsBindGroup", "goodsGroupId"],
+  paidGroup: ["paidBindGroup", "paidGroupId"],
+  goodsId: ["goodsId"],
+  stockCode: ["stockCode"],
+  command: ["commandName"],
+};
+function addSharedValue(kind, value, selectedId = null) {
+  for (const id of sharedSelects[kind] || []) addSelectValue(id, value, id === selectedId || !selectedId);
+}
+function removeSharedValue(kind, value) {
+  for (const id of sharedSelects[kind] || []) removeSelectValue(id, value);
+}
+function promptAdd(kind, label, selectedId) {
+  const value = window.prompt(`请输入新的${label}`);
+  if (!value || !value.trim()) return "";
+  addSharedValue(kind, value.trim(), selectedId);
+  return value.trim();
+}
 function applyOptions(options = {}) {
-  if ("physical_groups" in options) setDatalist("physicalGroupOptions", options.physical_groups);
-  if ("stock_groups" in options) setDatalist("stockGroupOptions", options.stock_groups);
-  if ("goods_groups" in options) setDatalist("goodsGroupOptions", options.goods_groups);
-  if ("paid_groups" in options) setDatalist("paidGroupOptions", options.paid_groups);
-  if ("goods_ids" in options) setDatalist("goodsIdOptions", mergeUnique(options.goods_ids, goodsItems.map((g) => g.goods_id)));
-  if ("stock_codes" in options) setDatalist("stockCodeOptions", mergeUnique(options.stock_codes, stockCompanies.map((s) => s.code)));
+  if ("physical_groups" in options) setSelectOptions("physicalGroupId", options.physical_groups);
+  if ("stock_groups" in options) {
+    setSelectOptions("stockBindGroup", options.stock_groups);
+    setSelectOptions("stockGroupId", options.stock_groups);
+  }
+  if ("goods_groups" in options) {
+    setSelectOptions("goodsBindGroup", options.goods_groups);
+    setSelectOptions("goodsGroupId", options.goods_groups);
+  }
+  if ("paid_groups" in options) {
+    setSelectOptions("paidBindGroup", options.paid_groups);
+    setSelectOptions("paidGroupId", options.paid_groups);
+  }
+  if ("goods_ids" in options) setSelectOptions("goodsId", mergeUnique(options.goods_ids, goodsItems.map((g) => g.goods_id)));
+  if ("stock_codes" in options) setSelectOptions("stockCode", mergeUnique(options.stock_codes, stockCompanies.map((s) => s.code)));
   if ("paid_commands" in options || "scanned_commands" in options) {
-    setDatalist("commandOptions", mergeUnique(
+    setSelectOptions("commandName", mergeUnique(
       options.paid_commands,
       paidCommands.map((c) => c.command),
       scannedCommands.map((c) => c.command)
@@ -288,6 +336,24 @@ async function refreshOptions() {
   });
   scannedCommands = options.scanned_commands || scannedCommands;
   applyOptions(options);
+}
+async function removeCurrentGroup(module, selectId, kind) {
+  const group_id = $(selectId).value;
+  if (!group_id) throw new Error("请先选择要删除的组");
+  if (!window.confirm(`确认删除 ${group_id}？该组下的配置会被清理。`)) return;
+  await apiPost("admin/group/remove", { module, group_id });
+  removeSharedValue(kind, group_id);
+  setStatus("组已删除");
+  await refreshOptions();
+}
+async function removeCurrentPhysicalGroup() {
+  const physical_group_id = $("physicalGroupId").value;
+  if (!physical_group_id) throw new Error("请先选择群号");
+  if (!window.confirm(`确认移除群 ${physical_group_id} 的 FinCenter 绑定？账户数据不会删除。`)) return;
+  await apiPost("admin/binding/remove", { module: "all", physical_group_id });
+  removeSharedValue("physical", physical_group_id);
+  setStatus("群绑定已移除");
+  await refreshOptions();
 }
 
 function switchTab(name) {
@@ -393,6 +459,14 @@ function editGoods(id) {
   $("goodsMaxPrice").value = g.max_price;
   $("goodsVolatility").value = g.volatility;
 }
+function createGoodsId() {
+  const value = promptAdd("goodsId", "物资 ID", "goodsId");
+  if (value) {
+    $("goodsName").value = "";
+    $("goodsBasePrice").value = 10;
+    $("goodsCurrentPrice").value = 10;
+  }
+}
 
 async function saveGoods() {
   const file = $("goodsImage").files[0];
@@ -472,6 +546,15 @@ function editStock(code) {
   $("stockTrend").value = s.trend_level;
   $("stockDescription").value = s.description || "";
 }
+function createStockCode() {
+  const value = promptAdd("stockCode", "股票代码", "stockCode");
+  if (value) {
+    $("stockName").value = "";
+    $("stockPrice").value = 100;
+    $("stockTrend").value = 0;
+    $("stockDescription").value = "";
+  }
+}
 
 async function saveStock() {
   await apiPost("admin/stock/company", {
@@ -525,6 +608,25 @@ function renderPaid() {
     </tr>`).join("");
   document.querySelectorAll("[data-toggle-command]").forEach((b) => b.onclick = () => toggleCommand(b.dataset.toggleCommand, b.dataset.enabled === "true"));
   document.querySelectorAll("[data-remove-command]").forEach((b) => b.onclick = () => removeCommand(b.dataset.removeCommand));
+}
+function editCommand(command) {
+  const row = paidCommands.find((x) => x.command === command);
+  const scanned = scannedCommands.find((x) => x.command === command);
+  if (row) {
+    $("commandCost").value = row.cost || 0;
+    $("commandEnabled").value = row.enabled ? "true" : "false";
+    $("commandDesc").value = row.description || "";
+  } else if (scanned) {
+    $("commandDesc").value = scanned.desc || "";
+  }
+}
+function createCommandName() {
+  const value = promptAdd("command", "命令", "commandName");
+  if (value) {
+    $("commandCost").value = $("paidDefaultCost").value || 5;
+    $("commandEnabled").value = "true";
+    $("commandDesc").value = "";
+  }
 }
 
 async function saveCommand() {
@@ -651,6 +753,16 @@ window.AstrBotPluginPage.ready().then(() => {
   document.querySelectorAll(".tab").forEach((b) => b.onclick = () => switchTab(b.dataset.tab));
   bind("loadOverview", loadOverview);
   document.querySelectorAll("[data-save-binding]").forEach((b) => b.onclick = () => saveBinding(b.dataset.saveBinding).catch((e) => setStatus(e.message || String(e))));
+  document.querySelectorAll("[data-add-select]").forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.addSelect;
+      const kind = id.startsWith("stock") ? "stockGroup" : (id.startsWith("goods") ? "goodsGroup" : "paidGroup");
+      const label = kind === "stockGroup" ? "股市组" : (kind === "goodsGroup" ? "物资组" : "付费组");
+      promptAdd(kind, label, id);
+    };
+  });
+  bind("addPhysicalGroup", () => promptAdd("physical", "群号", "physicalGroupId"));
+  bind("removePhysicalGroup", removeCurrentPhysicalGroup);
   bind("enableStock", () => setModule("stock", true));
   bind("disableStock", () => setModule("stock", false));
   bind("enableGoods", () => setModule("goods", true));
@@ -658,16 +770,31 @@ window.AstrBotPluginPage.ready().then(() => {
   bind("enablePaid", () => setModule("paid", true));
   bind("disablePaid", () => setModule("paid", false));
   bind("loadGoods", loadGoods);
+  bind("addGoodsGroup", () => promptAdd("goodsGroup", "物资组", "goodsGroupId"));
+  bind("removeGoodsGroup", () => removeCurrentGroup("goods", "goodsGroupId", "goodsGroup"));
+  bind("addGoodsId", createGoodsId);
+  bind("removeGoodsId", () => removeGoods($("goodsId").value));
+  $("goodsId").onchange = () => editGoods($("goodsId").value);
   bind("saveGoods", saveGoods);
   bind("resetGoods", resetGoods);
   $("clearGoodsForm").onclick = clearGoodsForm;
   bind("loadStock", loadStock);
+  bind("addStockGroup", () => promptAdd("stockGroup", "股市组", "stockGroupId"));
+  bind("removeStockGroup", () => removeCurrentGroup("stock", "stockGroupId", "stockGroup"));
+  bind("addStockCode", createStockCode);
+  bind("removeStockCode", () => removeStock($("stockCode").value));
+  $("stockCode").onchange = () => editStock($("stockCode").value);
   bind("saveStock", saveStock);
   $("clearStockForm").onclick = clearStockForm;
   bind("stockOpen", () => setStockMode("open"));
   bind("stockClose", () => setStockMode("close"));
   bind("stockAuto", () => setStockMode("auto"));
   bind("loadPaid", loadPaid);
+  bind("addPaidGroup", () => promptAdd("paidGroup", "付费组", "paidGroupId"));
+  bind("removePaidGroup", () => removeCurrentGroup("paid", "paidGroupId", "paidGroup"));
+  bind("addCommandName", createCommandName);
+  bind("removeCommandName", () => removeCommand($("commandName").value));
+  $("commandName").onchange = () => editCommand($("commandName").value);
   bind("saveCommand", saveCommand);
   bind("scanCommands", scanCommands);
   bind("loadSettings", loadSettings);
