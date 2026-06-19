@@ -82,7 +82,7 @@
     .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 5px; }
     .context-card, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
     .context-card { padding: 14px; display: grid; gap: 12px; }
-    .context-grid { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: end; }
+    .context-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; }
     .binding-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .summary-item { min-height: 58px; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: var(--surface-soft); display: grid; gap: 3px; }
     .summary-name { color: var(--muted); font-size: 12px; font-weight: 700; }
@@ -170,8 +170,6 @@
             <select id="physicalGroupId"></select>
           </div>
           <button id="addPhysicalGroup" class="ghost">新增群</button>
-          <button id="refreshGroups" class="ghost">刷新列表</button>
-          <button id="loadOverview">刷新配置</button>
           <button id="removePhysicalGroup" class="danger">移除绑定</button>
         </div>
         <div class="binding-summary">
@@ -488,7 +486,6 @@ let goodsItems = [];
 let stockCompanies = [];
 let paidCommands = [];
 let scannedCommands = [];
-let groupLabels = {};
 let currentDrawer = null;
 let activePopover = null;
 
@@ -551,7 +548,7 @@ function removeSelectOption(id, value) {
 }
 function displayGroup(v) {
   if (v === "*") return "全局 (*)";
-  return groupLabels[v] ? `${groupLabels[v]} (${v})` : v;
+  return v;
 }
 const selectGroups = {
   physical: ["physicalGroupId"],
@@ -651,24 +648,6 @@ function applyOptions(options = {}) {
     setSelectOptions("paidGroupId", options.paid_groups);
   }
   if ("scanned_commands" in options) scannedCommands = options.scanned_commands || scannedCommands;
-}
-async function refreshGroupList() {
-  let rows;
-  try {
-    rows = await apiGet("admin/discover-groups", {});
-  } catch (e) {
-    rows = await apiGet("admin/groups/discover", {});
-  }
-  groupLabels = {};
-  const ids = [];
-  for (const row of rows || []) {
-    const id = cleanValue(row.group_id);
-    if (!id) continue;
-    ids.push(id);
-    if (row.name) groupLabels[id] = row.name;
-  }
-  setSelectOptions("physicalGroupId", ids);
-  setStatus(`已刷新群列表：${ids.length} 个`);
 }
 async function refreshOptions() {
   const data = await apiGet("admin/options", {
@@ -1151,9 +1130,7 @@ window.AstrBotPluginPage.ready().then(() => {
   document.querySelectorAll("[data-save-binding]").forEach((b) => b.onclick = () => saveBinding(b.dataset.saveBinding).catch((e) => setStatus(e.message || String(e))));
   document.querySelectorAll("[data-create-select]").forEach((b) => b.onclick = () => createForSelect(b, b.dataset.createSelect));
   bind("addPhysicalGroup", (button) => openCreatePopover(button, "新增群", "输入群号", (value) => { addShared("physical", value, "physicalGroupId"); setStatus("群已添加到当前页面，请保存模块绑定后生效"); }));
-  bind("refreshGroups", refreshGroupList);
   bind("removePhysicalGroup", removeCurrentPhysicalGroup);
-  bind("loadOverview", loadOverview);
   $("physicalGroupId").onchange = () => loadOverview().catch((e) => setStatus(e.message || String(e)));
 
   bind("addBasicGroup", (button) => createForSelect(button, "basicGroupId"));
@@ -1196,8 +1173,12 @@ window.AstrBotPluginPage.ready().then(() => {
   renderStock();
   renderPaid();
   renderScanRows();
-  refreshOptions().then(() => loadBasic().catch(() => {})).catch((e) => setStatus(e.message || String(e)));
-  refreshGroupList().catch(() => {});
+  refreshOptions().then(async () => {
+    if (cleanValue($("physicalGroupId").value)) {
+      await loadOverview().catch(() => {});
+    }
+    await loadBasic().catch(() => {});
+  }).catch((e) => setStatus(e.message || String(e)));
   loadSettings().catch(() => {});
 });
 </script>

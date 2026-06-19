@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import base64
-import inspect
 import os
 import re
 import uuid
@@ -40,8 +39,6 @@ class FinCenterWebApi:
             routes = [
                 ("/overview", self.get_overview, ["GET"], "FinCenter 总览"),
                 ("/options", self.get_options, ["GET"], "读取 FinCenter 可选项"),
-                ("/discover-groups", self.discover_groups, ["GET"], "发现机器人所在群"),
-                ("/groups/discover", self.discover_groups, ["GET"], "发现机器人所在群"),
                 ("/settings", self.get_settings, ["GET"], "读取 FinCenter 设置"),
                 ("/settings", self.save_settings, ["POST"], "保存 FinCenter 设置"),
                 ("/binding", self.set_binding, ["POST"], "设置模块分组绑定"),
@@ -181,99 +178,6 @@ class FinCenterWebApi:
         if callable(save_config):
             save_config()
 
-    async def _maybe_call(self, obj, *args, **kwargs):
-        if not callable(obj):
-            return None
-        try:
-            result = obj(*args, **kwargs)
-            if inspect.isawaitable(result):
-                return await result
-            return result
-        except Exception:
-            return None
-
-    def _collect_group_rows(self, payload, source: str) -> list[dict]:
-        rows = []
-        if isinstance(payload, dict):
-            if "data" in payload:
-                return self._collect_group_rows(payload.get("data"), source)
-            payload = [payload]
-        if not isinstance(payload, (list, tuple, set)):
-            return rows
-        for item in payload:
-            if not isinstance(item, dict):
-                continue
-            group_id = (
-                item.get("group_id")
-                or item.get("group")
-                or item.get("id")
-                or item.get("groupId")
-                or item.get("room_id")
-            )
-            group_id = self._clean_id(group_id)
-            if not self._is_real_option_value(group_id):
-                continue
-            name = (
-                item.get("group_name")
-                or item.get("groupName")
-                or item.get("name")
-                or item.get("nickname")
-                or item.get("room_name")
-                or ""
-            )
-            rows.append({"group_id": group_id, "name": str(name or ""), "source": source})
-        return rows
-
-    def _context_candidates(self) -> list:
-        seen = set()
-        queue = [getattr(self.plugin, "context", None)]
-        out = []
-        attr_names = (
-            "platform_manager", "provider_manager", "platforms", "providers",
-            "platform_insts", "provider_insts", "instances", "bots", "clients",
-            "bot", "client", "adapter", "api",
-        )
-        while queue and len(out) < 80:
-            obj = queue.pop(0)
-            if obj is None or id(obj) in seen:
-                continue
-            seen.add(id(obj))
-            out.append(obj)
-            for name in attr_names:
-                try:
-                    value = getattr(obj, name)
-                except Exception:
-                    continue
-                if isinstance(value, dict):
-                    queue.extend(value.values())
-                elif isinstance(value, (list, tuple, set)):
-                    queue.extend(value)
-                elif value is not None and not isinstance(value, (str, bytes, int, float, bool)):
-                    queue.append(value)
-        return out
-
-    async def _discover_context_groups(self) -> list[dict]:
-        rows = []
-        for obj in self._context_candidates():
-            source = obj.__class__.__name__
-            for method_name in ("get_group_list", "get_groups", "group_list", "get_joined_groups"):
-                result = await self._maybe_call(getattr(obj, method_name, None))
-                rows.extend(self._collect_group_rows(result, source))
-            call_action = getattr(obj, "call_action", None)
-            if callable(call_action):
-                for action in ("get_group_list", "get_group_info"):
-                    result = await self._maybe_call(call_action, action)
-                    rows.extend(self._collect_group_rows(result, source))
-            api = getattr(obj, "api", None)
-            call_action = getattr(api, "call_action", None) if api is not None else None
-            if callable(call_action):
-                result = await self._maybe_call(call_action, "get_group_list")
-                rows.extend(self._collect_group_rows(result, source))
-        dedup = {}
-        for row in rows:
-            dedup.setdefault(row["group_id"], row)
-        return sorted(dedup.values(), key=lambda x: x["group_id"])
-
     # ---- 总览 / 设置 ----
     async def get_overview(self):
         physical_group_id = self._clean_id(request.args.get("group_id", ""))
@@ -372,19 +276,6 @@ class FinCenterWebApi:
             "paid_commands": self._sorted_values(paid_commands),
             "scanned_commands": list_other_plugin_commands(),
         })
-
-    async def discover_groups(self):
-        rows = {row["group_id"]: row for row in await self._discover_context_groups()}
-        with self.plugin.db.session_scope() as session:
-            for row in session.query(MarketGroupBinding.physical_group_id).distinct().all():
-                group_id = self._clean_id(row[0])
-                if self._is_real_option_value(group_id):
-                    rows.setdefault(group_id, {"group_id": group_id, "name": "", "source": "FinCenter绑定"})
-            for row in session.query(UserAccount.group_id).distinct().all():
-                group_id = self._clean_id(row[0])
-                if self._is_real_option_value(group_id):
-                    rows.setdefault(group_id, {"group_id": group_id, "name": "", "source": "账户数据"})
-        return self._ok(sorted(rows.values(), key=lambda x: x["group_id"]))
 
     async def get_settings(self):
         cfg = self.plugin.config
