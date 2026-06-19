@@ -10,6 +10,7 @@ module_path 匹配，从而正确绑定 self。
 import os
 import sys
 import tempfile
+import inspect
 from pathlib import Path
 
 # AstrBot extracts plugins to data/plugins/<name>/ — ensure the plugin root is on sys.path
@@ -75,6 +76,28 @@ class FinCenterPlugin(Star):
     def _parse_args(event: AstrMessageEvent) -> list:
         """从 event.message_str 解析出参数列表"""
         return event.message_str.split()
+
+    @staticmethod
+    def _call_with_feature_config(func, args: tuple, feature_config):
+        """兼容 AstrBot 热更新后仍缓存旧 src.* 模块的情况。"""
+        try:
+            sig = inspect.signature(func)
+        except (TypeError, ValueError):
+            return func(*args, feature_config)
+
+        params = sig.parameters
+        accepts_feature = "feature_config" in params or any(
+            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+        accepts_extra_positional = any(
+            p.kind is inspect.Parameter.VAR_POSITIONAL for p in params.values()
+        )
+
+        if accepts_feature:
+            return func(*args, feature_config=feature_config)
+        if accepts_extra_positional:
+            return func(*args, feature_config)
+        return func(*args)
 
     # ── 初始化 ────────────────────────────────────────────────
 
@@ -332,7 +355,11 @@ class FinCenterPlugin(Star):
 
         # 聊天奖励
         if getattr(feature_config, "enabled", True):
-            self.reward_service.process(group_id, user_id, user_name, feature_config)
+            self._call_with_feature_config(
+                self.reward_service.process,
+                (group_id, user_id, user_name),
+                feature_config,
+            )
 
         # 付费指令检查
         message = event.message_str.strip()
@@ -350,8 +377,10 @@ class FinCenterPlugin(Star):
             logger.warning("PaidCommandService 缺少 try_deduct，请确认 src/services/paid_command.py 已更新")
             return
 
-        status, reply, record = try_deduct(
-            message, paid_group_id, group_id, user_id, feature_config
+        status, reply, record = self._call_with_feature_config(
+            try_deduct,
+            (message, paid_group_id, group_id, user_id),
+            feature_config,
         )
         if status == "charged" and record is not None:
             event.set_extra("fc_paid_record", record)
