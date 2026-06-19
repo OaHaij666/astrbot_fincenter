@@ -40,6 +40,7 @@ class FinCenterWebApi:
             routes = [
                 ("/overview", self.get_overview, ["GET"], "FinCenter 总览"),
                 ("/options", self.get_options, ["GET"], "读取 FinCenter 可选项"),
+                ("/discover-groups", self.discover_groups, ["GET"], "发现机器人所在群"),
                 ("/groups/discover", self.discover_groups, ["GET"], "发现机器人所在群"),
                 ("/settings", self.get_settings, ["GET"], "读取 FinCenter 设置"),
                 ("/settings", self.save_settings, ["POST"], "保存 FinCenter 设置"),

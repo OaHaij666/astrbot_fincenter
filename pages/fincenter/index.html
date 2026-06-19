@@ -171,7 +171,7 @@
           </div>
           <button id="addPhysicalGroup" class="ghost">新增群</button>
           <button id="refreshGroups" class="ghost">刷新列表</button>
-          <button id="loadOverview">读取</button>
+          <button id="loadOverview">刷新配置</button>
           <button id="removePhysicalGroup" class="danger">移除绑定</button>
         </div>
         <div class="binding-summary">
@@ -653,7 +653,12 @@ function applyOptions(options = {}) {
   if ("scanned_commands" in options) scannedCommands = options.scanned_commands || scannedCommands;
 }
 async function refreshGroupList() {
-  const rows = await apiGet("admin/groups/discover", {});
+  let rows;
+  try {
+    rows = await apiGet("admin/discover-groups", {});
+  } catch (e) {
+    rows = await apiGet("admin/groups/discover", {});
+  }
   groupLabels = {};
   const ids = [];
   for (const row of rows || []) {
@@ -692,7 +697,7 @@ async function loadOverview() {
   $("stockGroupId").value = $("stockBindGroup").value;
   $("paidGroupId").value = $("paidBindGroup").value;
   $("basicGroupId").value = $("basicBindGroup").value;
-  setStatus(`服务状态：股市 ${data.modules.stock ? "启用" : "禁用"} / 物资 ${data.modules.goods ? "启用" : "禁用"} / 付费 ${data.modules.paid ? "启用" : "禁用"}`);
+  setStatus(`已刷新当前群配置。服务状态：股市 ${data.modules.stock ? "启用" : "禁用"} / 物资 ${data.modules.goods ? "启用" : "禁用"} / 付费 ${data.modules.paid ? "启用" : "禁用"}`);
   await refreshOptions();
 }
 async function saveBinding(module) {
