@@ -5,233 +5,420 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FinCenter 管理台</title>
   <style>
-    :root { color-scheme: light dark; font-family: "Microsoft YaHei", system-ui, sans-serif; }
+    :root {
+      color-scheme: light dark;
+      font-family: "Microsoft YaHei", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #eef2f6;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fc;
+      --line: #d7dee9;
+      --line-strong: #b9c4d3;
+      --text: #202936;
+      --muted: #66758a;
+      --primary: #1f6feb;
+      --primary-strong: #1659c7;
+      --success: #11845b;
+      --danger: #c0353b;
+      --warning: #a16207;
+      --nav: #172033;
+      --nav-text: #dce5f2;
+      --nav-muted: #9aa8bc;
+      --shadow: 0 16px 44px rgba(31, 41, 55, .10);
+    }
+    [data-theme="dark"] {
+      --bg: #10151f;
+      --surface: #171f2d;
+      --surface-soft: #111827;
+      --line: #2e3a4d;
+      --line-strong: #40506a;
+      --text: #e7edf6;
+      --muted: #9ca9bb;
+      --primary: #5b9dff;
+      --primary-strong: #3d83ea;
+      --success: #2fb67d;
+      --danger: #ef686f;
+      --warning: #e4a11b;
+      --nav: #0b1020;
+      --nav-text: #e4ebf7;
+      --nav-muted: #8997ad;
+      --shadow: 0 16px 44px rgba(0, 0, 0, .35);
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #f6f8fb; color: #263244; }
-    [data-theme="dark"] body { background: #111827; color: #e5e7eb; }
-    main { max-width: 1240px; margin: 0 auto; padding: 20px; }
-    header { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
-    h1 { font-size: 24px; margin: 0; }
-    h2 { font-size: 17px; margin: 0 0 12px; }
-    h3 { font-size: 14px; margin: 14px 0 8px; color: #475569; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-    .tab { background: #e2e8f0; color: #1f2937; }
-    .tab.active { background: #2563eb; color: white; }
-    section { display: none; background: rgba(255,255,255,.96); border: 1px solid #dbe4ef; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
-    section.active { display: block; }
-    [data-theme="dark"] section { background: #1f2937; border-color: #374151; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin: 10px 0; }
-    label { font-size: 13px; color: #64748b; display: block; margin-bottom: 4px; }
-    input, textarea, select { width: 100%; min-height: 34px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 8px; background: #fff; color: #111827; }
-    textarea { min-height: 70px; resize: vertical; }
-    [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select { background: #111827; color: #e5e7eb; border-color: #4b5563; }
-    button { min-height: 34px; border: 0; border-radius: 6px; padding: 0 12px; background: #2563eb; color: white; cursor: pointer; white-space: nowrap; }
+    html, body { min-height: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
+    .sidebar { background: var(--nav); color: var(--nav-text); padding: 22px 16px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
+    .brand { padding: 4px 6px 12px; border-bottom: 1px solid rgba(255,255,255,.12); }
+    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px; background: #2c7be5; color: white; font-weight: 800; margin-bottom: 12px; }
+    .brand-title { font-size: 18px; font-weight: 700; letter-spacing: 0; }
+    .brand-sub { font-size: 12px; color: var(--nav-muted); margin-top: 4px; }
+    .tabs { display: grid; gap: 6px; }
+    .tab { min-height: 40px; border: 0; border-radius: 8px; padding: 0 12px; background: transparent; color: var(--nav-muted); cursor: pointer; text-align: left; font-weight: 600; }
+    .tab.active { background: rgba(255,255,255,.11); color: var(--nav-text); box-shadow: inset 3px 0 0 var(--primary); }
+    .workspace { min-width: 0; padding: 22px 26px 32px; }
+    .topbar { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .page-title { display: grid; gap: 4px; }
+    h1 { font-size: 26px; line-height: 1.15; margin: 0; letter-spacing: 0; }
+    h2 { font-size: 18px; line-height: 1.25; margin: 0; }
+    h3 { font-size: 13px; line-height: 1.25; margin: 0; color: var(--muted); font-weight: 700; }
+    .eyebrow { color: var(--muted); font-size: 13px; }
+    .status { min-width: 180px; max-width: 420px; min-height: 34px; display: flex; align-items: center; justify-content: flex-end; text-align: right; font-size: 13px; color: var(--primary); white-space: pre-wrap; }
+    section { display: none; }
+    section.active { display: grid; gap: 18px; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; }
+    .panel-head { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+    .panel-title { display: grid; gap: 3px; }
+    .panel-body { padding: 16px; }
+    .split { display: grid; grid-template-columns: minmax(260px, .9fr) minmax(420px, 1.5fr); gap: 18px; align-items: start; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 12px; align-items: end; }
+    .grid.compact { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; font-weight: 700; }
+    input, textarea, select { width: 100%; min-height: 36px; border: 1px solid var(--line-strong); border-radius: 7px; padding: 7px 9px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; }
+    textarea { min-height: 82px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid rgba(31,111,235,.18); border-color: var(--primary); }
+    button { min-height: 36px; border: 0; border-radius: 7px; padding: 0 12px; background: var(--primary); color: white; cursor: pointer; white-space: nowrap; font: inherit; font-size: 13px; font-weight: 700; }
+    button:hover { background: var(--primary-strong); }
     button.secondary { background: #64748b; }
-    button.danger { background: #dc2626; }
-    button.ok { background: #059669; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
-    th, td { border-bottom: 1px solid #e2e8f0; padding: 8px; text-align: left; vertical-align: middle; }
-    [data-theme="dark"] th, [data-theme="dark"] td { border-color: #374151; }
-    .status { font-size: 13px; color: #2563eb; white-space: pre-wrap; }
-    .muted { color: #64748b; font-size: 13px; }
-    .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 12px; }
-    .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; }
+    button.secondary:hover { background: #526174; }
+    button.danger { background: var(--danger); }
+    button.danger:hover { background: #a5282e; }
+    button.ok { background: var(--success); }
+    button.ok:hover { background: #0d6f4d; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: middle; }
+    th { color: var(--muted); font-size: 12px; font-weight: 800; background: var(--surface-soft); }
+    tr:hover td { background: rgba(31,111,235,.04); }
+    .muted { color: var(--muted); font-size: 13px; }
+    .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: #e8eef7; color: #334155; font-size: 12px; }
+    [data-theme="dark"] .pill { background: #243044; color: #dbe6f5; }
+    .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--surface-soft); }
     .actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .picker { display: flex; gap: 6px; align-items: center; }
     .picker select { min-width: 150px; flex: 1 1 auto; }
     .picker button { flex: 0 0 auto; padding: 0 10px; }
-    .rename-panel { display: flex; gap: 8px; align-items: end; background: #eef4ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px; margin: 0 0 14px; }
+    .rename-panel { display: flex; gap: 8px; align-items: end; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px; margin: 0 0 18px; box-shadow: var(--shadow); }
     .rename-panel[hidden] { display: none; }
-    [data-theme="dark"] .rename-panel { background: #172554; border-color: #1d4ed8; }
+    [data-theme="dark"] .rename-panel { background: #2a1d10; border-color: #854d0e; }
     .rename-panel .rename-input-wrap { flex: 1 1 240px; }
     .wide { grid-column: 1 / -1; }
+    @media (max-width: 940px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; padding: 14px; }
+      .tabs { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+      .workspace { padding: 16px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .status { justify-content: flex-start; text-align: left; }
+      .split { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>FinCenter 管理台</h1>
-    <div id="topStatus" class="status"></div>
-  </header>
-
-  <nav class="tabs">
-    <button class="tab active" data-tab="groups">群绑定</button>
-    <button class="tab" data-tab="goods">物资组</button>
-    <button class="tab" data-tab="stock">股市组</button>
-    <button class="tab" data-tab="paid">付费组</button>
-    <button class="tab" data-tab="settings">基础设置</button>
-  </nav>
-
-  <div id="renamePanel" class="rename-panel" hidden>
-    <div class="rename-input-wrap">
-      <label id="renameLabel">重命名</label>
-      <input id="renameInput">
+<main class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">FC</div>
+      <div class="brand-title">FinCenter</div>
+      <div class="brand-sub">群财富系统控制台</div>
     </div>
-    <button id="renameApply" class="ok">确认</button>
-    <button id="renameCancel" class="secondary">取消</button>
-  </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="groups">群绑定</button>
+      <button class="tab" data-tab="goods">物资组</button>
+      <button class="tab" data-tab="stock">股市组</button>
+      <button class="tab" data-tab="paid">付费组</button>
+      <button class="tab" data-tab="settings">基础设置</button>
+    </nav>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="page-title">
+        <div class="eyebrow">Administration</div>
+        <h1 id="pageHeading">群绑定</h1>
+      </div>
+      <div id="topStatus" class="status"></div>
+    </header>
+
+    <div id="renamePanel" class="rename-panel" hidden>
+      <div class="rename-input-wrap">
+        <label id="renameLabel">重命名</label>
+        <input id="renameInput">
+      </div>
+      <button id="renameApply" class="ok">确认</button>
+      <button id="renameCancel" class="secondary">取消</button>
+    </div>
 
   <section id="groups" class="active">
-    <h2>群绑定与模块开关</h2>
-    <div class="grid">
-      <div>
-        <label>群号</label>
-        <div class="picker">
-          <select id="physicalGroupId"></select>
-          <button id="addPhysicalGroup" class="secondary">新增</button>
-          <button id="removePhysicalGroup" class="danger">删除</button>
+    <div class="split">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>群选择</h2>
+            <div class="muted">当前操作群</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <label>群号</label>
+          <div class="picker">
+            <select id="physicalGroupId"></select>
+            <button id="addPhysicalGroup" class="secondary">新增</button>
+            <button id="removePhysicalGroup" class="danger">删除</button>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button id="loadOverview">读取群配置</button>
+          </div>
         </div>
       </div>
-      <button id="loadOverview">读取群配置</button>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>全局模块</h2>
+            <div class="muted">启停运行时模块</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <button id="enableStock" class="ok">启用股市模块</button>
+            <button id="disableStock" class="danger">禁用股市模块</button>
+            <button id="enableGoods" class="ok">启用物资模块</button>
+            <button id="disableGoods" class="danger">禁用物资模块</button>
+            <button id="enablePaid" class="ok">启用付费拦截</button>
+            <button id="disablePaid" class="danger">禁用付费拦截</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <h3>全局模块</h3>
-    <div class="row">
-      <button id="enableStock" class="ok">启用股市模块</button>
-      <button id="disableStock" class="danger">禁用股市模块</button>
-      <button id="enableGoods" class="ok">启用物资模块</button>
-      <button id="disableGoods" class="danger">禁用物资模块</button>
-      <button id="enablePaid" class="ok">启用付费拦截</button>
-      <button id="disablePaid" class="danger">禁用付费拦截</button>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>本群绑定</h2>
+          <div class="muted">每个群可绑定不同的股市组、物资组和付费组</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>模块</th><th>启用</th><th>绑定组</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>股市</td>
+              <td><select id="stockBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
+              <td><div class="picker"><select id="stockBindGroup"></select><button data-add-select="stockBindGroup" class="secondary">新增</button></div></td>
+              <td><button data-save-binding="stock">保存</button></td>
+            </tr>
+            <tr>
+              <td>物资</td>
+              <td><select id="goodsBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
+              <td><div class="picker"><select id="goodsBindGroup"></select><button data-add-select="goodsBindGroup" class="secondary">新增</button></div></td>
+              <td><button data-save-binding="goods">保存</button></td>
+            </tr>
+            <tr>
+              <td>付费</td>
+              <td><select id="paidBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
+              <td><div class="picker"><select id="paidBindGroup"></select><button data-add-select="paidBindGroup" class="secondary">新增</button></div></td>
+              <td><button data-save-binding="paid">保存</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <h3>本群绑定</h3>
-    <table>
-      <thead><tr><th>模块</th><th>启用</th><th>绑定组</th><th>操作</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>股市</td>
-          <td><select id="stockBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><div class="picker"><select id="stockBindGroup"></select><button data-add-select="stockBindGroup" class="secondary">新增</button></div></td>
-          <td><button data-save-binding="stock">保存</button></td>
-        </tr>
-        <tr>
-          <td>物资</td>
-          <td><select id="goodsBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><div class="picker"><select id="goodsBindGroup"></select><button data-add-select="goodsBindGroup" class="secondary">新增</button></div></td>
-          <td><button data-save-binding="goods">保存</button></td>
-        </tr>
-        <tr>
-          <td>付费</td>
-          <td><select id="paidBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select></td>
-          <td><div class="picker"><select id="paidBindGroup"></select><button data-add-select="paidBindGroup" class="secondary">新增</button></div></td>
-          <td><button data-save-binding="paid">保存</button></td>
-        </tr>
-      </tbody>
-    </table>
   </section>
 
   <section id="goods">
-    <h2>物资组</h2>
-    <div class="grid">
-      <div><label>物资组 ID</label><div class="picker"><select id="goodsGroupId"></select><button id="addGoodsGroup" class="secondary">新增</button><button id="removeGoodsGroup" class="danger">删除</button></div></div>
-      <button id="loadGoods">读取物资组</button>
-      <button id="resetGoods" class="secondary">重置价格</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>物资组</h2>
+          <div class="muted">商品定义与价格区间</div>
+        </div>
+        <div class="row">
+          <button id="loadGoods">读取物资组</button>
+          <button id="resetGoods" class="secondary">重置价格</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="grid compact">
+          <div class="wide"><label>物资组 ID</label><div class="picker"><select id="goodsGroupId"></select><button id="addGoodsGroup" class="secondary">新增</button><button id="removeGoodsGroup" class="danger">删除</button></div></div>
+          <div><label>物资 ID</label><div class="picker"><select id="goodsId"></select><button id="addGoodsId" class="secondary">新增</button><button id="removeGoodsId" class="danger">删除</button></div></div>
+          <div><label>名称</label><input id="goodsName"></div>
+          <div><label>图标</label><input id="goodsIcon" value="📦"></div>
+          <div><label>基准价</label><input id="goodsBasePrice" type="number" step="0.01" value="10"></div>
+          <div><label>当前价</label><input id="goodsCurrentPrice" type="number" step="0.01" value="10"></div>
+          <div><label>最低价</label><input id="goodsMinPrice" type="number" step="0.01" value="1"></div>
+          <div><label>最高价</label><input id="goodsMaxPrice" type="number" step="0.01" value="100"></div>
+          <div><label>波动率</label><input id="goodsVolatility" type="number" step="0.01" value="0.1"></div>
+          <div class="wide"><label>图片</label><input id="goodsImage" type="file" accept="image/*"></div>
+          <div class="row wide">
+            <button id="saveGoods" class="ok">保存商品</button>
+            <button id="clearGoodsForm" class="secondary">清空</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <h3>商品</h3>
-    <div class="grid">
-      <div><label>物资 ID</label><div class="picker"><select id="goodsId"></select><button id="addGoodsId" class="secondary">新增</button><button id="removeGoodsId" class="danger">删除</button></div></div>
-      <div><label>名称</label><input id="goodsName"></div>
-      <div><label>图标</label><input id="goodsIcon" value="📦"></div>
-      <div><label>基准价</label><input id="goodsBasePrice" type="number" step="0.01" value="10"></div>
-      <div><label>当前价</label><input id="goodsCurrentPrice" type="number" step="0.01" value="10"></div>
-      <div><label>最低价</label><input id="goodsMinPrice" type="number" step="0.01" value="1"></div>
-      <div><label>最高价</label><input id="goodsMaxPrice" type="number" step="0.01" value="100"></div>
-      <div><label>波动率</label><input id="goodsVolatility" type="number" step="0.01" value="0.1"></div>
-      <div class="wide"><label>图片</label><input id="goodsImage" type="file" accept="image/*"></div>
-      <button id="saveGoods" class="ok">保存商品</button>
-      <button id="clearGoodsForm" class="secondary">清空</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>商品列表</h2>
+          <div class="muted">当前物资组</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>图片</th><th>ID</th><th>名称</th><th>价格</th><th>范围</th><th>波动</th><th>操作</th></tr></thead>
+          <tbody id="goodsRows"></tbody>
+        </table>
+      </div>
     </div>
-    <table>
-      <thead><tr><th>图片</th><th>ID</th><th>名称</th><th>价格</th><th>范围</th><th>波动</th><th>操作</th></tr></thead>
-      <tbody id="goodsRows"></tbody>
-    </table>
   </section>
 
   <section id="stock">
-    <h2>股市组</h2>
-    <div class="grid">
-      <div><label>股市组 ID</label><div class="picker"><select id="stockGroupId"></select><button id="addStockGroup" class="secondary">新增</button><button id="removeStockGroup" class="danger">删除</button></div></div>
-      <button id="loadStock">读取股市组</button>
-      <button id="stockOpen" class="ok">开市</button>
-      <button id="stockClose" class="danger">休市</button>
-      <button id="stockAuto" class="secondary">自动</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>股市组</h2>
+          <div class="muted">公司定义与行情状态</div>
+        </div>
+        <div class="row">
+          <button id="loadStock">读取股市组</button>
+          <button id="stockOpen" class="ok">开市</button>
+          <button id="stockClose" class="danger">休市</button>
+          <button id="stockAuto" class="secondary">自动</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="grid">
+          <div class="wide"><label>股市组 ID</label><div class="picker"><select id="stockGroupId"></select><button id="addStockGroup" class="secondary">新增</button><button id="removeStockGroup" class="danger">删除</button></div></div>
+          <div><label>代码</label><div class="picker"><select id="stockCode"></select><button id="addStockCode" class="secondary">新增</button><button id="removeStockCode" class="danger">删除</button></div></div>
+          <div><label>名称</label><input id="stockName"></div>
+          <div><label>图标</label><input id="stockIcon"></div>
+          <div><label>当前价</label><input id="stockPrice" type="number" step="0.01" value="100"></div>
+          <div><label>趋势级别</label><input id="stockTrend" type="number" min="-3" max="3" step="1" value="0"></div>
+          <div class="wide"><label>描述</label><textarea id="stockDescription"></textarea></div>
+          <div class="row wide">
+            <button id="saveStock" class="ok">保存股票</button>
+            <button id="clearStockForm" class="secondary">清空</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <h3>股票</h3>
-    <div class="grid">
-      <div><label>代码</label><div class="picker"><select id="stockCode"></select><button id="addStockCode" class="secondary">新增</button><button id="removeStockCode" class="danger">删除</button></div></div>
-      <div><label>名称</label><input id="stockName"></div>
-      <div><label>图标</label><input id="stockIcon"></div>
-      <div><label>当前价</label><input id="stockPrice" type="number" step="0.01" value="100"></div>
-      <div><label>趋势级别</label><input id="stockTrend" type="number" min="-3" max="3" step="1" value="0"></div>
-      <div class="wide"><label>描述</label><textarea id="stockDescription"></textarea></div>
-      <button id="saveStock" class="ok">保存股票</button>
-      <button id="clearStockForm" class="secondary">清空</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>股票列表</h2>
+          <div class="muted">当前股市组</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>代码</th><th>名称</th><th>价格</th><th>趋势</th><th>描述</th><th>操作</th></tr></thead>
+          <tbody id="stockRows"></tbody>
+        </table>
+      </div>
     </div>
-    <table>
-      <thead><tr><th>代码</th><th>名称</th><th>价格</th><th>趋势</th><th>描述</th><th>操作</th></tr></thead>
-      <tbody id="stockRows"></tbody>
-    </table>
   </section>
 
   <section id="paid">
-    <h2>付费组</h2>
-    <div class="grid">
-      <div><label>付费组 ID</label><div class="picker"><select id="paidGroupId"></select><button id="addPaidGroup" class="secondary">新增</button><button id="removePaidGroup" class="danger">删除</button></div></div>
-      <button id="loadPaid">读取付费组</button>
-      <button id="scanCommands" class="secondary">扫描其他插件命令</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>付费组</h2>
+          <div class="muted">外部插件命令扣费规则</div>
+        </div>
+        <div class="row">
+          <button id="loadPaid">读取付费组</button>
+          <button id="scanCommands" class="secondary">扫描其他插件命令</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="grid">
+          <div class="wide"><label>付费组 ID</label><div class="picker"><select id="paidGroupId"></select><button id="addPaidGroup" class="secondary">新增</button><button id="removePaidGroup" class="danger">删除</button></div></div>
+          <div><label>命令</label><div class="picker"><select id="commandName"></select><button id="addCommandName" class="secondary">新增</button><button id="removeCommandName" class="danger">删除</button></div></div>
+          <div><label>费用</label><input id="commandCost" type="number" step="0.01" value="5"></div>
+          <div><label>状态</label><select id="commandEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+          <div class="wide"><label>描述</label><input id="commandDesc" placeholder="查询天气"></div>
+          <div class="row wide">
+            <button id="saveCommand" class="ok">保存命令</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <h3>付费命令</h3>
-    <div class="grid">
-      <div><label>命令</label><div class="picker"><select id="commandName"></select><button id="addCommandName" class="secondary">新增</button><button id="removeCommandName" class="danger">删除</button></div></div>
-      <div><label>费用</label><input id="commandCost" type="number" step="0.01" value="5"></div>
-      <div><label>状态</label><select id="commandEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-      <div class="wide"><label>描述</label><input id="commandDesc" placeholder="查询天气"></div>
-      <button id="saveCommand" class="ok">保存命令</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>命令列表</h2>
+          <div class="muted">当前付费组</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>组</th><th>命令</th><th>费用</th><th>描述</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="commandRows"></tbody>
+        </table>
+      </div>
     </div>
-    <table>
-      <thead><tr><th>组</th><th>命令</th><th>费用</th><th>描述</th><th>状态</th><th>操作</th></tr></thead>
-      <tbody id="commandRows"></tbody>
-    </table>
-    <h3>扫描结果</h3>
-    <div id="scanResult" class="muted"></div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>扫描结果</h2>
+          <div class="muted">可配置为付费的其他插件命令</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="scanResult" class="muted"></div>
+      </div>
+    </div>
   </section>
 
   <section id="settings">
-    <h2>基础设置</h2>
-    <div class="grid">
-      <div class="wide"><label>管理员 ID</label><input id="adminIds" placeholder="多个 ID 用逗号/空格/换行分隔"></div>
-      <div><label>跨群金钱数据</label><select id="crossGroupData"><option value="false">关闭</option><option value="true">开启</option></select></div>
-      <div><label>货币名称</label><input id="currencyName"></div>
-      <div><label>货币图标</label><input id="currencyIcon"></div>
-      <div><label>初始余额</label><input id="initialBalance" type="number" step="0.01"></div>
-      <div><label>开户费用</label><input id="openAccountCost" type="number" step="0.01"></div>
-      <div><label>签到启用</label><select id="signinEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-      <div><label>签到基础奖励</label><input id="signinRewardBase" type="number" step="0.01"></div>
-      <div><label>签到随机奖励</label><input id="signinRewardVar" type="number" step="0.01"></div>
-      <div><label>发言奖励启用</label><select id="chatRewardEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-      <div><label>发言奖励</label><input id="chatRewardAmount" type="number" step="0.01"></div>
-      <div><label>发言冷却秒</label><input id="chatRewardCooldown" type="number" step="1"></div>
-      <div><label>股市更新秒</label><input id="stockUpdateInterval" type="number" step="1"></div>
-      <div><label>股票手续费率</label><input id="stockFeeRate" type="number" step="0.0001"></div>
-      <div><label>股市波动率</label><input id="stockVolatility" type="number" step="0.001"></div>
-      <div><label>交易时间限制</label><select id="stockTradingHours"><option value="false">关闭</option><option value="true">开启</option></select></div>
-      <div><label>K线数量</label><input id="stockKlineCandles" type="number" step="1"></div>
-      <div><label>新闻启用</label><select id="stockNewsEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-      <div><label>新闻触发概率</label><input id="stockNewsProb" type="number" step="0.01"></div>
-      <div><label>物资刷新秒</label><input id="goodsRefreshInterval" type="number" step="1"></div>
-      <div><label>物资默认波动</label><input id="goodsPriceVolatility" type="number" step="0.01"></div>
-      <div><label>用户交易</label><select id="goodsUserTradeEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-      <div><label>用户交易税率</label><input id="goodsUserTradeTax" type="number" step="0.01"></div>
-      <div><label>付费默认费用</label><input id="paidDefaultCost" type="number" step="0.01"></div>
-      <div><label>管理员免费</label><select id="paidIgnoreAdmin"><option value="true">是</option><option value="false">否</option></select></div>
-      <div><label>付费命令前缀</label><input id="paidPrefixes" placeholder="/, !"></div>
-      <div><label>渲染策略</label><select id="renderStrategy"><option value="local">local</option><option value="remote">remote</option></select></div>
-      <div class="wide"><label>余额不足提示</label><textarea id="paidInsufficientMsg"></textarea></div>
-      <div class="wide"><label>扣费提示</label><textarea id="paidDeductMsg"></textarea></div>
-      <button id="loadSettings">读取设置</button>
-      <button id="saveSettings" class="ok">保存设置</button>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>基础设置</h2>
+          <div class="muted">货币、奖励、市场与付费默认参数</div>
+        </div>
+        <div class="row">
+          <button id="loadSettings">读取设置</button>
+          <button id="saveSettings" class="ok">保存设置</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="grid">
+          <div class="wide"><label>管理员 ID</label><input id="adminIds" placeholder="多个 ID 用逗号/空格/换行分隔"></div>
+          <div><label>跨群金钱数据</label><select id="crossGroupData"><option value="false">关闭</option><option value="true">开启</option></select></div>
+          <div><label>货币名称</label><input id="currencyName"></div>
+          <div><label>货币图标</label><input id="currencyIcon"></div>
+          <div><label>初始余额</label><input id="initialBalance" type="number" step="0.01"></div>
+          <div><label>开户费用</label><input id="openAccountCost" type="number" step="0.01"></div>
+          <div><label>签到启用</label><select id="signinEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+          <div><label>签到基础奖励</label><input id="signinRewardBase" type="number" step="0.01"></div>
+          <div><label>签到随机奖励</label><input id="signinRewardVar" type="number" step="0.01"></div>
+          <div><label>发言奖励启用</label><select id="chatRewardEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+          <div><label>发言奖励</label><input id="chatRewardAmount" type="number" step="0.01"></div>
+          <div><label>发言冷却秒</label><input id="chatRewardCooldown" type="number" step="1"></div>
+          <div><label>股市更新秒</label><input id="stockUpdateInterval" type="number" step="1"></div>
+          <div><label>股票手续费率</label><input id="stockFeeRate" type="number" step="0.0001"></div>
+          <div><label>股市波动率</label><input id="stockVolatility" type="number" step="0.001"></div>
+          <div><label>交易时间限制</label><select id="stockTradingHours"><option value="false">关闭</option><option value="true">开启</option></select></div>
+          <div><label>K线数量</label><input id="stockKlineCandles" type="number" step="1"></div>
+          <div><label>新闻启用</label><select id="stockNewsEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+          <div><label>新闻触发概率</label><input id="stockNewsProb" type="number" step="0.01"></div>
+          <div><label>物资刷新秒</label><input id="goodsRefreshInterval" type="number" step="1"></div>
+          <div><label>物资默认波动</label><input id="goodsPriceVolatility" type="number" step="0.01"></div>
+          <div><label>用户交易</label><select id="goodsUserTradeEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+          <div><label>用户交易税率</label><input id="goodsUserTradeTax" type="number" step="0.01"></div>
+          <div><label>付费默认费用</label><input id="paidDefaultCost" type="number" step="0.01"></div>
+          <div><label>管理员免费</label><select id="paidIgnoreAdmin"><option value="true">是</option><option value="false">否</option></select></div>
+          <div><label>付费命令前缀</label><input id="paidPrefixes" placeholder="/, !"></div>
+          <div><label>渲染策略</label><select id="renderStrategy"><option value="local">local</option><option value="remote">remote</option></select></div>
+          <div class="wide"><label>余额不足提示</label><textarea id="paidInsufficientMsg"></textarea></div>
+          <div class="wide"><label>扣费提示</label><textarea id="paidDeductMsg"></textarea></div>
+        </div>
+      </div>
     </div>
   </section>
+  </div>
 </main>
 
 <script src="/api/plugin/page/bridge-sdk.js"></script>
@@ -447,6 +634,8 @@ async function removeCurrentPhysicalGroup() {
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll("section").forEach((s) => s.classList.toggle("active", s.id === name));
+  const titles = { groups: "群绑定", goods: "物资组", stock: "股市组", paid: "付费组", settings: "基础设置" };
+  $("pageHeading").textContent = titles[name] || "FinCenter";
 }
 
 async function loadOverview() {
