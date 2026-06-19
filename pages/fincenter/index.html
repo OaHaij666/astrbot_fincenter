@@ -83,7 +83,7 @@
     .context-card, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
     .context-card { padding: 14px; display: grid; gap: 12px; }
     .context-grid { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: end; }
-    .binding-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .binding-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
     .summary-item { min-height: 58px; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: var(--surface-soft); display: grid; gap: 3px; }
     .summary-name { color: var(--muted); font-size: 12px; font-weight: 700; }
     .summary-value { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -100,7 +100,7 @@
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
     .grid.wide { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
     .field-span { grid-column: 1 / -1; }
-    .module-grid { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 14px; }
+    .module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
     .module-card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 12px; background: var(--surface); }
     .module-card-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
     .badge { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: #e8eef7; color: #334155; font-size: 12px; font-weight: 700; }
@@ -149,6 +149,7 @@
     </div>
     <nav class="tabs">
       <button class="tab active" data-tab="groups">群配置</button>
+      <button class="tab" data-tab="basic">基础功能组</button>
       <button class="tab" data-tab="goods">物资组</button>
       <button class="tab" data-tab="stock">股市组</button>
       <button class="tab" data-tab="paid">付费组</button>
@@ -169,10 +170,12 @@
             <select id="physicalGroupId"></select>
           </div>
           <button id="addPhysicalGroup" class="ghost">新增群</button>
+          <button id="refreshGroups" class="ghost">刷新列表</button>
           <button id="loadOverview">读取</button>
           <button id="removePhysicalGroup" class="danger">移除绑定</button>
         </div>
         <div class="binding-summary">
+          <div class="summary-item"><div class="summary-name">基础</div><div id="basicSummary" class="summary-value">未读取</div></div>
           <div class="summary-item"><div class="summary-name">物资</div><div id="goodsSummary" class="summary-value">未读取</div></div>
           <div class="summary-item"><div class="summary-name">股市</div><div id="stockSummary" class="summary-value">未读取</div></div>
           <div class="summary-item"><div class="summary-name">付费</div><div id="paidSummary" class="summary-value">未读取</div></div>
@@ -188,17 +191,27 @@
             <h2>本群功能绑定</h2>
             <h3>选择当前群启用哪些模块，以及每个模块使用哪个配置组</h3>
           </div>
-          <div class="toolbar">
-            <button id="enableStock" class="ok">启用股市服务</button>
-            <button id="disableStock" class="secondary">禁用股市服务</button>
-            <button id="enableGoods" class="ok">启用物资服务</button>
-            <button id="disableGoods" class="secondary">禁用物资服务</button>
-            <button id="enablePaid" class="ok">启用付费拦截</button>
-            <button id="disablePaid" class="secondary">禁用付费拦截</button>
-          </div>
         </div>
         <div class="panel-body">
           <div class="module-grid">
+            <article class="module-card">
+              <div class="module-card-head">
+                <div><h2>基础</h2><div class="muted">货币、开户、签到、发言奖励</div></div>
+                <span id="basicBindBadge" class="badge">未读取</span>
+              </div>
+              <div>
+                <label>本群状态</label>
+                <select id="basicBindEnabled"><option value="true">启用</option><option value="false">禁用</option></select>
+              </div>
+              <div>
+                <label>基础功能组</label>
+                <div class="actions">
+                  <select id="basicBindGroup"></select>
+                  <button class="ghost icon" data-create-select="basicBindGroup" title="新增基础功能组">+</button>
+                </div>
+              </div>
+              <button data-save-binding="basic">保存基础绑定</button>
+            </article>
             <article class="module-card">
               <div class="module-card-head">
                 <div><h2>物资</h2><div class="muted">商品市场与背包</div></div>
@@ -253,6 +266,44 @@
               </div>
               <button data-save-binding="paid">保存付费绑定</button>
             </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="basic">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <h2>基础功能组</h2>
+            <h3>同一套基础组可绑定到多个群，控制货币、开户、签到和发言奖励</h3>
+          </div>
+          <div class="toolbar">
+            <div class="field">
+              <label>当前基础功能组</label>
+              <select id="basicGroupId"></select>
+            </div>
+            <button id="addBasicGroup" class="ghost">新增基础功能组</button>
+            <button id="loadBasic">读取</button>
+            <button id="saveBasic" class="ok">保存基础组</button>
+            <button id="removeBasicGroup" class="danger">删除基础组</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="grid wide">
+            <div><label>货币名称</label><input id="basicCurrencyName"></div>
+            <div><label>货币图标</label><input id="basicCurrencyIcon"></div>
+            <div><label>初始余额</label><input id="basicInitialBalance" type="number" step="0.01"></div>
+            <div><label>代开户费用</label><input id="basicOpenAccountCost" type="number" step="0.01"></div>
+            <div><label>签到</label><select id="basicSigninEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+            <div><label>签到基础奖励</label><input id="basicSigninRewardBase" type="number" step="0.01"></div>
+            <div><label>签到随机浮动</label><input id="basicSigninRewardVar" type="number" step="0.01"></div>
+            <div><label>连续签到递增</label><input id="basicSigninConsecutiveBonus" type="number" step="0.01"></div>
+            <div><label>连续奖励上限天数</label><input id="basicSigninMaxConsecutive" type="number" step="1"></div>
+            <div><label>发言奖励</label><select id="basicChatRewardEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+            <div><label>每条消息奖励</label><input id="basicChatRewardAmount" type="number" step="0.01"></div>
+            <div><label>发言奖励冷却秒</label><input id="basicChatRewardCooldown" type="number" step="1"></div>
+            <div><label>每日奖励上限</label><input id="basicChatRewardDailyLimit" type="number" step="1"></div>
           </div>
         </div>
       </div>
@@ -362,8 +413,8 @@
       <div class="panel">
         <div class="panel-head">
           <div class="panel-title">
-            <h2>基础设置</h2>
-            <h3>全局参数保存后立即应用到当前插件实例</h3>
+            <h2>全局设置</h2>
+            <h3>管理员、数据域、市场默认参数和渲染策略</h3>
           </div>
           <div class="toolbar">
             <button id="loadSettings">读取设置</button>
@@ -374,23 +425,13 @@
           <div class="grid wide">
             <div class="field-span"><label>管理员 ID</label><textarea id="adminIds" placeholder="多个 ID 用逗号、空格或换行分隔"></textarea></div>
             <div><label>跨群金钱数据</label><select id="crossGroupData"><option value="false">关闭</option><option value="true">开启</option></select></div>
-            <div><label>货币名称</label><input id="currencyName"></div>
-            <div><label>货币图标</label><input id="currencyIcon"></div>
-            <div><label>初始余额</label><input id="initialBalance" type="number" step="0.01"></div>
-            <div><label>开户费用</label><input id="openAccountCost" type="number" step="0.01"></div>
           </div>
         </div>
       </div>
       <div class="panel">
-        <div class="panel-head"><div class="panel-title"><h2>奖励与市场参数</h2><h3>签到、发言奖励、股市、物资刷新</h3></div></div>
+        <div class="panel-head"><div class="panel-title"><h2>市场默认参数</h2><h3>股市和物资引擎的全局运行参数</h3></div></div>
         <div class="panel-body">
           <div class="grid wide">
-            <div><label>签到</label><select id="signinEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-            <div><label>签到基础奖励</label><input id="signinRewardBase" type="number" step="0.01"></div>
-            <div><label>签到随机浮动</label><input id="signinRewardVar" type="number" step="0.01"></div>
-            <div><label>发言奖励</label><select id="chatRewardEnabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
-            <div><label>每条消息奖励</label><input id="chatRewardAmount" type="number" step="0.01"></div>
-            <div><label>发言奖励冷却秒</label><input id="chatRewardCooldown" type="number" step="1"></div>
             <div><label>股价更新秒</label><input id="stockUpdateInterval" type="number" step="1"></div>
             <div><label>股市手续费率</label><input id="stockFeeRate" type="number" step="0.0001"></div>
             <div><label>股市默认波动</label><input id="stockVolatility" type="number" step="0.001"></div>
@@ -447,6 +488,7 @@ let goodsItems = [];
 let stockCompanies = [];
 let paidCommands = [];
 let scannedCommands = [];
+let groupLabels = {};
 let currentDrawer = null;
 let activePopover = null;
 
@@ -507,9 +549,13 @@ function removeSelectOption(id, value) {
   [...select.options].forEach((opt) => { if (opt.value === value) opt.remove(); });
   if (select.value === value) select.value = "";
 }
-function displayGroup(v) { return v === "*" ? "全局 (*)" : v; }
+function displayGroup(v) {
+  if (v === "*") return "全局 (*)";
+  return groupLabels[v] ? `${groupLabels[v]} (${v})` : v;
+}
 const selectGroups = {
   physical: ["physicalGroupId"],
+  basicGroup: ["basicBindGroup", "basicGroupId"],
   goodsGroup: ["goodsBindGroup", "goodsGroupId"],
   stockGroup: ["stockBindGroup", "stockGroupId"],
   paidGroup: ["paidBindGroup", "paidGroupId"],
@@ -583,11 +629,15 @@ function switchTab(name) {
   closePopover();
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll("section").forEach((s) => s.classList.toggle("active", s.id === name));
-  const titles = { groups: "群配置", goods: "物资组", stock: "股市组", paid: "付费组", settings: "基础设置" };
+  const titles = { groups: "群配置", basic: "基础功能组", goods: "物资组", stock: "股市组", paid: "付费组", settings: "基础设置" };
   $("pageHeading").textContent = titles[name] || "FinCenter";
 }
 function applyOptions(options = {}) {
   if ("physical_groups" in options) setSelectOptions("physicalGroupId", options.physical_groups);
+  if ("basic_groups" in options) {
+    setSelectOptions("basicBindGroup", options.basic_groups);
+    setSelectOptions("basicGroupId", options.basic_groups);
+  }
   if ("goods_groups" in options) {
     setSelectOptions("goodsBindGroup", options.goods_groups);
     setSelectOptions("goodsGroupId", options.goods_groups);
@@ -601,6 +651,19 @@ function applyOptions(options = {}) {
     setSelectOptions("paidGroupId", options.paid_groups);
   }
   if ("scanned_commands" in options) scannedCommands = options.scanned_commands || scannedCommands;
+}
+async function refreshGroupList() {
+  const rows = await apiGet("admin/groups/discover", {});
+  groupLabels = {};
+  const ids = [];
+  for (const row of rows || []) {
+    const id = cleanValue(row.group_id);
+    if (!id) continue;
+    ids.push(id);
+    if (row.name) groupLabels[id] = row.name;
+  }
+  setSelectOptions("physicalGroupId", ids);
+  setStatus(`已刷新群列表：${ids.length} 个`);
 }
 async function refreshOptions() {
   const data = await apiGet("admin/options", {
@@ -619,7 +682,7 @@ async function loadOverview() {
     return;
   }
   const data = await apiGet("admin/overview", { group_id: groupId });
-  for (const module of ["goods", "stock", "paid"]) {
+  for (const module of ["basic", "goods", "stock", "paid"]) {
     const b = data.bindings?.[module] || { enabled: true, group_id: groupId };
     $(`${module}BindEnabled`).value = b.enabled ? "true" : "false";
     addSelectOption(`${module}BindGroup`, b.group_id || groupId, true);
@@ -628,6 +691,7 @@ async function loadOverview() {
   $("goodsGroupId").value = $("goodsBindGroup").value;
   $("stockGroupId").value = $("stockBindGroup").value;
   $("paidGroupId").value = $("paidBindGroup").value;
+  $("basicGroupId").value = $("basicBindGroup").value;
   setStatus(`服务状态：股市 ${data.modules.stock ? "启用" : "禁用"} / 物资 ${data.modules.goods ? "启用" : "禁用"} / 付费 ${data.modules.paid ? "启用" : "禁用"}`);
   await refreshOptions();
 }
@@ -661,6 +725,7 @@ async function setModule(module, enabled) {
 }
 
 function groupKindFromSelect(id) {
+  if (id.startsWith("basic")) return ["basicGroup", "基础功能组"];
   if (id.startsWith("goods")) return ["goodsGroup", "物资组"];
   if (id.startsWith("stock")) return ["stockGroup", "股市组"];
   if (id.startsWith("paid")) return ["paidGroup", "付费组"];
@@ -670,6 +735,7 @@ function createForSelect(button, selectId) {
   const [kind, label] = groupKindFromSelect(selectId);
   openCreatePopover(button, `新增${label}`, `输入${label}名称`, (value) => {
     addShared(kind, value, selectId);
+    if (kind === "basicGroup") $("basicGroupId").value = value;
     if (kind === "goodsGroup") $("goodsGroupId").value = value;
     if (kind === "stockGroup") $("stockGroupId").value = value;
     if (kind === "paidGroup") $("paidGroupId").value = value;
@@ -683,6 +749,60 @@ async function removeCurrentGroup(module, selectId, kind) {
   await apiPost("admin/group/remove", { module, group_id });
   removeShared(kind, group_id);
   setStatus("组已删除");
+  await refreshOptions();
+}
+
+async function loadBasic() {
+  const basic_group_id = cleanValue($("basicGroupId").value) || "default";
+  const data = await apiGet("admin/basic/config", { basic_group_id });
+  const group = data.group || {};
+  addShared("basicGroup", data.basic_group_id || basic_group_id, "basicGroupId");
+  $("basicCurrencyName").value = group.currency?.currency_name || "";
+  $("basicCurrencyIcon").value = group.currency?.currency_icon || "";
+  $("basicInitialBalance").value = group.currency?.initial_balance ?? 0;
+  $("basicOpenAccountCost").value = group.currency?.open_account_cost ?? 0;
+  $("basicSigninEnabled").value = group.signin?.signin_enabled ? "true" : "false";
+  $("basicSigninRewardBase").value = group.signin?.signin_reward_base ?? 0;
+  $("basicSigninRewardVar").value = group.signin?.signin_reward_var ?? 0;
+  $("basicSigninConsecutiveBonus").value = group.signin?.signin_consecutive_bonus ?? 0;
+  $("basicSigninMaxConsecutive").value = group.signin?.signin_max_consecutive ?? 0;
+  $("basicChatRewardEnabled").value = group.chat_reward?.chat_reward_enabled ? "true" : "false";
+  $("basicChatRewardAmount").value = group.chat_reward?.chat_reward_amount ?? 0;
+  $("basicChatRewardCooldown").value = group.chat_reward?.chat_reward_cooldown ?? 0;
+  $("basicChatRewardDailyLimit").value = group.chat_reward?.chat_reward_daily_limit ?? 0;
+  applyOptions({ basic_groups: (data.groups || []).map((g) => g.group_id) });
+  setStatus(`已读取基础功能组 ${displayGroup($("basicGroupId").value)}`);
+  await refreshOptions();
+}
+async function saveBasic() {
+  const basic_group_id = cleanValue($("basicGroupId").value);
+  if (!basic_group_id) throw new Error("请先选择或新增基础功能组");
+  await apiPost("admin/basic/config", {
+    basic_group_id,
+    group: {
+      currency: {
+        currency_name: $("basicCurrencyName").value,
+        currency_icon: $("basicCurrencyIcon").value,
+        initial_balance: numVal("basicInitialBalance"),
+        open_account_cost: numVal("basicOpenAccountCost"),
+      },
+      signin: {
+        signin_enabled: boolVal("basicSigninEnabled"),
+        signin_reward_base: numVal("basicSigninRewardBase"),
+        signin_reward_var: numVal("basicSigninRewardVar"),
+        signin_consecutive_bonus: numVal("basicSigninConsecutiveBonus"),
+        signin_max_consecutive: Number($("basicSigninMaxConsecutive").value || 0),
+      },
+      chat_reward: {
+        chat_reward_enabled: boolVal("basicChatRewardEnabled"),
+        chat_reward_amount: numVal("basicChatRewardAmount"),
+        chat_reward_cooldown: Number($("basicChatRewardCooldown").value || 0),
+        chat_reward_daily_limit: Number($("basicChatRewardDailyLimit").value || 0),
+      },
+    },
+  });
+  addShared("basicGroup", basic_group_id, "basicGroupId");
+  setStatus("基础功能组已保存");
   await refreshOptions();
 }
 
@@ -965,16 +1085,6 @@ async function loadSettings() {
   const data = await apiGet("admin/settings", {});
   $("adminIds").value = (data.basic?.admin_ids || []).join("\n");
   $("crossGroupData").value = data.basic?.cross_group_data ? "true" : "false";
-  $("currencyName").value = data.currency?.currency_name || "";
-  $("currencyIcon").value = data.currency?.currency_icon || "";
-  $("initialBalance").value = data.currency?.initial_balance ?? 0;
-  $("openAccountCost").value = data.currency?.open_account_cost ?? 0;
-  $("signinEnabled").value = data.signin?.signin_enabled ? "true" : "false";
-  $("signinRewardBase").value = data.signin?.signin_reward_base ?? 0;
-  $("signinRewardVar").value = data.signin?.signin_reward_var ?? 0;
-  $("chatRewardEnabled").value = data.chat_reward?.chat_reward_enabled ? "true" : "false";
-  $("chatRewardAmount").value = data.chat_reward?.chat_reward_amount ?? 0;
-  $("chatRewardCooldown").value = data.chat_reward?.chat_reward_cooldown ?? 0;
   $("stockUpdateInterval").value = data.stock?.stock_update_interval ?? 300;
   $("stockFeeRate").value = data.stock?.stock_fee_rate ?? 0.001;
   $("stockVolatility").value = data.stock?.stock_volatility ?? 0.02;
@@ -997,22 +1107,6 @@ async function loadSettings() {
 async function saveSettings() {
   await apiPost("admin/settings", {
     basic: { admin_ids: $("adminIds").value, cross_group_data: boolVal("crossGroupData") },
-    currency: {
-      currency_name: $("currencyName").value,
-      currency_icon: $("currencyIcon").value,
-      initial_balance: numVal("initialBalance"),
-      open_account_cost: numVal("openAccountCost"),
-    },
-    signin: {
-      signin_enabled: boolVal("signinEnabled"),
-      signin_reward_base: numVal("signinRewardBase"),
-      signin_reward_var: numVal("signinRewardVar"),
-    },
-    chat_reward: {
-      chat_reward_enabled: boolVal("chatRewardEnabled"),
-      chat_reward_amount: numVal("chatRewardAmount"),
-      chat_reward_cooldown: Number($("chatRewardCooldown").value || 0),
-    },
     stock: {
       stock_update_interval: Number($("stockUpdateInterval").value || 300),
       stock_fee_rate: numVal("stockFeeRate"),
@@ -1052,15 +1146,16 @@ window.AstrBotPluginPage.ready().then(() => {
   document.querySelectorAll("[data-save-binding]").forEach((b) => b.onclick = () => saveBinding(b.dataset.saveBinding).catch((e) => setStatus(e.message || String(e))));
   document.querySelectorAll("[data-create-select]").forEach((b) => b.onclick = () => createForSelect(b, b.dataset.createSelect));
   bind("addPhysicalGroup", (button) => openCreatePopover(button, "新增群", "输入群号", (value) => { addShared("physical", value, "physicalGroupId"); setStatus("群已添加到当前页面，请保存模块绑定后生效"); }));
+  bind("refreshGroups", refreshGroupList);
   bind("removePhysicalGroup", removeCurrentPhysicalGroup);
   bind("loadOverview", loadOverview);
   $("physicalGroupId").onchange = () => loadOverview().catch((e) => setStatus(e.message || String(e)));
-  bind("enableStock", () => setModule("stock", true));
-  bind("disableStock", () => setModule("stock", false));
-  bind("enableGoods", () => setModule("goods", true));
-  bind("disableGoods", () => setModule("goods", false));
-  bind("enablePaid", () => setModule("paid", true));
-  bind("disablePaid", () => setModule("paid", false));
+
+  bind("addBasicGroup", (button) => createForSelect(button, "basicGroupId"));
+  bind("loadBasic", loadBasic);
+  bind("saveBasic", saveBasic);
+  bind("removeBasicGroup", () => removeCurrentGroup("basic", "basicGroupId", "basicGroup"));
+  $("basicGroupId").onchange = () => loadBasic().catch((e) => setStatus(e.message || String(e)));
 
   bind("addGoodsGroup", (button) => createForSelect(button, "goodsGroupId"));
   bind("loadGoods", loadGoods);
@@ -1096,7 +1191,8 @@ window.AstrBotPluginPage.ready().then(() => {
   renderStock();
   renderPaid();
   renderScanRows();
-  refreshOptions().catch((e) => setStatus(e.message || String(e)));
+  refreshOptions().then(() => loadBasic().catch(() => {})).catch((e) => setStatus(e.message || String(e)));
+  refreshGroupList().catch(() => {});
   loadSettings().catch(() => {});
 });
 </script>

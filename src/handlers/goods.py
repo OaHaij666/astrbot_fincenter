@@ -10,7 +10,8 @@ class GoodsHandler:
     def __init__(self, plugin, html_render):
         self.plugin = plugin
 
-    async def handle(self, event, args, goods_group_id, account_group_id, user_id, user_name, group_enabled=True):
+    async def handle(self, event, args, goods_group_id, account_group_id, user_id, user_name, group_enabled=True, feature_config=None):
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
         if not self.plugin.goods_market:
             yield event.plain_result("物资市场模块未启用")
             return
@@ -46,8 +47,8 @@ class GoodsHandler:
             stock_data = {b['goods_id']: b['amount'] for b in backpack}
             result = plotter.render_goods_market_html(
                 goods_list, stock_data,
-                self.plugin.config.currency.currency_name,
-                self.plugin.config.currency.currency_icon,
+                currency_cfg.currency_name,
+                currency_cfg.currency_icon,
             )
             if result:
                 html_content, data = result
@@ -55,7 +56,7 @@ class GoodsHandler:
                 if image_path:
                     yield event.image_result(image_path)
                     return
-            currency_icon = self.plugin.config.currency.currency_icon
+            currency_icon = currency_cfg.currency_icon
             lines = [f"📦 物资市场（分组 {goods_group_id}）", "━━━━━━━━━━━━━━"]
             for g in goods_list:
                 change_sign = "+" if g['change_pct'] >= 0 else ""
@@ -85,8 +86,8 @@ class GoodsHandler:
                 return
             result = plotter.render_goods_backpack_html(
                 user_name, backpack,
-                self.plugin.config.currency.currency_name,
-                self.plugin.config.currency.currency_icon,
+                currency_cfg.currency_name,
+                currency_cfg.currency_icon,
             )
             if result:
                 html_content, data = result
@@ -94,7 +95,7 @@ class GoodsHandler:
                 if image_path:
                     yield event.image_result(image_path)
                     return
-            currency_icon = self.plugin.config.currency.currency_icon
+            currency_icon = currency_cfg.currency_icon
             msg = f"🎒 {user_name} 的物资背包\n━━━━━━━━━━━━━━\n"
             total_value = 0
             for b in backpack:

@@ -21,7 +21,7 @@ class StockHandler:
             group_id=stock_group_id, code=code
         ).order_by(StockHistory.timestamp.desc()).limit(limit).all()
 
-    async def _build_market_image(self, stock_group_id, account_group_id, user_id):
+    async def _build_market_image(self, stock_group_id, account_group_id, user_id, feature_config=None):
         if not self.plugin.stock_market:
             return None
 
@@ -63,10 +63,11 @@ class StockHandler:
             if kline_b64:
                 kline_images[code] = kline_b64
 
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
         result = plotter.render_stock_market_html(
             market_data, holdings_data, news_data,
-            self.plugin.config.currency.currency_name,
-            self.plugin.config.currency.currency_icon,
+            currency_cfg.currency_name,
+            currency_cfg.currency_icon,
             kline_html_list=kline_images,
         )
         if not result:
@@ -132,7 +133,8 @@ class StockHandler:
         html_content, data = result
         return await self.plugin._render_image(html_content, data)
 
-    async def handle(self, event, args, stock_group_id, account_group_id, user_id, user_name, group_enabled=True):
+    async def handle(self, event, args, stock_group_id, account_group_id, user_id, user_name, group_enabled=True, feature_config=None):
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
         if not self.plugin.stock_market:
             yield event.plain_result("股市模块未启用")
             return
@@ -167,7 +169,7 @@ class StockHandler:
             return
 
         if sub == "market":
-            image_path = await self._build_market_image(stock_group_id, account_group_id, user_id)
+            image_path = await self._build_market_image(stock_group_id, account_group_id, user_id, feature_config)
             if image_path:
                 yield event.image_result(image_path)
                 return
@@ -202,8 +204,8 @@ class StockHandler:
                 return
             result = plotter.render_stock_assets_html(
                 user_name, holdings,
-                self.plugin.config.currency.currency_name,
-                self.plugin.config.currency.currency_icon,
+                currency_cfg.currency_name,
+                currency_cfg.currency_icon,
             )
             if result:
                 html_content, data = result
@@ -259,8 +261,8 @@ class StockHandler:
                 return
             result = plotter.render_stock_news_html(
                 news_list,
-                self.plugin.config.currency.currency_name,
-                self.plugin.config.currency.currency_icon,
+                currency_cfg.currency_name,
+                currency_cfg.currency_icon,
             )
             if result:
                 html_content, data = result

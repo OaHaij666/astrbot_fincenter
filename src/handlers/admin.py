@@ -13,7 +13,7 @@ class AdminHandler:
     def __init__(self, plugin, html_render):
         self.plugin = plugin
 
-    async def handle(self, event, args, raw_group_id, group_id, user_id, user_name):
+    async def handle(self, event, args, raw_group_id, group_id, user_id, user_name, feature_config=None):
         if str(user_id) not in self.plugin.config.admin_id_set:
             yield event.plain_result("仅限管理员使用")
             return
@@ -80,7 +80,8 @@ class AdminHandler:
             return
 
         sub = args[2]
-        currency_name = self.plugin.config.currency.currency_name
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
+        currency_name = currency_cfg.currency_name
         stock_enabled, stock_group_id = self.plugin.get_stock_binding(raw_group_id)
         goods_enabled, goods_group_id = self.plugin.get_goods_binding(raw_group_id)
 
@@ -317,13 +318,13 @@ class AdminHandler:
                 )
 
         elif sub in ("paidcmd", "付费", "付费指令"):
-            async for r in self._handle_paidcmd(event, args, raw_group_id, group_id):
+            async for r in self._handle_paidcmd(event, args, raw_group_id, group_id, feature_config):
                 yield r
 
         else:
             yield event.plain_result("未知管理指令")
 
-    async def _handle_paidcmd(self, event, args, raw_group_id, group_id):
+    async def _handle_paidcmd(self, event, args, raw_group_id, group_id, feature_config=None):
         action = args[3] if len(args) >= 4 else None
         service = self.plugin.paid_command_service
         paid_enabled, paid_group_id = self.plugin.get_paid_binding(raw_group_id)
@@ -382,7 +383,8 @@ class AdminHandler:
                     "示例: /fc admin paidcmd add weather 5 查天气收费"
                 )
                 return
-            currency_icon = self.plugin.config.currency.currency_icon
+            currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
+            currency_icon = currency_cfg.currency_icon
             status = "启用" if paid_enabled else "禁用"
             lines = [f"💴 付费指令配置（组: {paid_group_id} / {status}）", "━━━━━━━━━━━━━━"]
             for r in rows:
@@ -488,7 +490,7 @@ class AdminHandler:
             "/fc admin paidcmd enable <cmd>"
         )
 
-    async def handle_rank(self, event, args, raw_group_id, group_id, user_id, user_name):
+    async def handle_rank(self, event, args, raw_group_id, group_id, user_id, user_name, feature_config=None):
         """财富排行榜（普通用户和管理员均可调用）"""
         limit = 20
         if len(args) >= 3:
@@ -524,10 +526,11 @@ class AdminHandler:
 
         rank_data.sort(key=lambda x: x['total_wealth'], reverse=True)
 
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
         result = plotter.render_rank_html(
             rank_data,
-            self.plugin.config.currency.currency_name,
-            self.plugin.config.currency.currency_icon,
+            currency_cfg.currency_name,
+            currency_cfg.currency_icon,
         )
 
         if result:
@@ -538,7 +541,7 @@ class AdminHandler:
                 return
 
         # 文字回退
-        currency_icon = self.plugin.config.currency.currency_icon
+        currency_icon = currency_cfg.currency_icon
         lines = [f"🏆 财富排行榜 TOP{len(rank_data)}", "━━━━━━━━━━━━━━"]
         for i, r in enumerate(rank_data[:20], 1):
             medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(i, f"{i}.")

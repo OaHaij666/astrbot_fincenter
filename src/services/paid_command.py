@@ -163,6 +163,7 @@ class PaidCommandService:
         paid_group_id: str,
         account_group_id: str,
         user_id: str,
+        feature_config=None,
     ) -> tuple[str, str | None, dict | None]:
         """尝试扣费。
 
@@ -192,7 +193,7 @@ class PaidCommandService:
             return "ignore_admin", None, None
 
         cost = float(match["cost"])
-        currency_name = self.config.currency.currency_name
+        currency_name = (feature_config.currency.currency_name if feature_config else self.config.currency.currency_name)
 
         with self.db.session_scope() as session:
             user = session.query(UserAccount).filter_by(

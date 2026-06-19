@@ -122,6 +122,14 @@
       }
     }
   },
+  "basic_feature_groups": {
+    "description": "基础功能组（由插件页面维护）：货币、开户、签到、发言奖励",
+    "type": "list",
+    "items": {
+      "type": "dict"
+    },
+    "default": []
+  },
   "stock": {
     "description": "股市设置",
     "type": "object",

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import inspect
 import os
 import re
 import uuid
@@ -24,6 +25,7 @@ from src.core.database import (
     get_china_time,
 )
 from src.markets.stock import StockTechnicalState
+from src.services import basic_features
 from src.services.command_registry import list_other_plugin_commands
 
 
@@ -38,12 +40,15 @@ class FinCenterWebApi:
             routes = [
                 ("/overview", self.get_overview, ["GET"], "FinCenter 总览"),
                 ("/options", self.get_options, ["GET"], "读取 FinCenter 可选项"),
+                ("/groups/discover", self.discover_groups, ["GET"], "发现机器人所在群"),
                 ("/settings", self.get_settings, ["GET"], "读取 FinCenter 设置"),
                 ("/settings", self.save_settings, ["POST"], "保存 FinCenter 设置"),
                 ("/binding", self.set_binding, ["POST"], "设置模块分组绑定"),
                 ("/binding/remove", self.remove_binding, ["POST"], "删除模块分组绑定"),
                 ("/module", self.set_module, ["POST"], "启停模块"),
                 ("/group/remove", self.remove_group, ["POST"], "删除模块组"),
+                ("/basic/config", self.get_basic_config, ["GET"], "读取基础功能组"),
+                ("/basic/config", self.save_basic_config, ["POST"], "保存基础功能组"),
                 ("/goods/config", self.get_goods_config, ["GET"], "读取物资组配置"),
                 ("/goods/item", self.save_goods_item, ["POST"], "保存物资"),
                 ("/goods/item/remove", self.remove_goods_item, ["POST"], "删除物资"),
@@ -116,6 +121,7 @@ class FinCenterWebApi:
     @staticmethod
     def _module_getter_name(module: str) -> str:
         return {
+            "basic": "get_basic_binding",
             "stock": "get_stock_binding",
             "goods": "get_goods_binding",
             "paid": "get_paid_binding",
@@ -174,12 +180,105 @@ class FinCenterWebApi:
         if callable(save_config):
             save_config()
 
+    async def _maybe_call(self, obj, *args, **kwargs):
+        if not callable(obj):
+            return None
+        try:
+            result = obj(*args, **kwargs)
+            if inspect.isawaitable(result):
+                return await result
+            return result
+        except Exception:
+            return None
+
+    def _collect_group_rows(self, payload, source: str) -> list[dict]:
+        rows = []
+        if isinstance(payload, dict):
+            if "data" in payload:
+                return self._collect_group_rows(payload.get("data"), source)
+            payload = [payload]
+        if not isinstance(payload, (list, tuple, set)):
+            return rows
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            group_id = (
+                item.get("group_id")
+                or item.get("group")
+                or item.get("id")
+                or item.get("groupId")
+                or item.get("room_id")
+            )
+            group_id = self._clean_id(group_id)
+            if not self._is_real_option_value(group_id):
+                continue
+            name = (
+                item.get("group_name")
+                or item.get("groupName")
+                or item.get("name")
+                or item.get("nickname")
+                or item.get("room_name")
+                or ""
+            )
+            rows.append({"group_id": group_id, "name": str(name or ""), "source": source})
+        return rows
+
+    def _context_candidates(self) -> list:
+        seen = set()
+        queue = [getattr(self.plugin, "context", None)]
+        out = []
+        attr_names = (
+            "platform_manager", "provider_manager", "platforms", "providers",
+            "platform_insts", "provider_insts", "instances", "bots", "clients",
+            "bot", "client", "adapter", "api",
+        )
+        while queue and len(out) < 80:
+            obj = queue.pop(0)
+            if obj is None or id(obj) in seen:
+                continue
+            seen.add(id(obj))
+            out.append(obj)
+            for name in attr_names:
+                try:
+                    value = getattr(obj, name)
+                except Exception:
+                    continue
+                if isinstance(value, dict):
+                    queue.extend(value.values())
+                elif isinstance(value, (list, tuple, set)):
+                    queue.extend(value)
+                elif value is not None and not isinstance(value, (str, bytes, int, float, bool)):
+                    queue.append(value)
+        return out
+
+    async def _discover_context_groups(self) -> list[dict]:
+        rows = []
+        for obj in self._context_candidates():
+            source = obj.__class__.__name__
+            for method_name in ("get_group_list", "get_groups", "group_list", "get_joined_groups"):
+                result = await self._maybe_call(getattr(obj, method_name, None))
+                rows.extend(self._collect_group_rows(result, source))
+            call_action = getattr(obj, "call_action", None)
+            if callable(call_action):
+                for action in ("get_group_list", "get_group_info"):
+                    result = await self._maybe_call(call_action, action)
+                    rows.extend(self._collect_group_rows(result, source))
+            api = getattr(obj, "api", None)
+            call_action = getattr(api, "call_action", None) if api is not None else None
+            if callable(call_action):
+                result = await self._maybe_call(call_action, "get_group_list")
+                rows.extend(self._collect_group_rows(result, source))
+        dedup = {}
+        for row in rows:
+            dedup.setdefault(row["group_id"], row)
+        return sorted(dedup.values(), key=lambda x: x["group_id"])
+
     # ---- 总览 / 设置 ----
     async def get_overview(self):
         physical_group_id = self._clean_id(request.args.get("group_id", ""))
         bindings = {}
         if physical_group_id:
-            for module in ("stock", "goods", "paid"):
+            for module in ("basic", "stock", "goods", "paid"):
                 enabled, group_id = self._get_binding(physical_group_id, module)
                 bindings[module] = {"enabled": enabled, "group_id": group_id}
         return self._ok({
@@ -202,6 +301,7 @@ class FinCenterWebApi:
         paid_group_id = self._clean_id(request.args.get("paid_group_id", ""))
 
         physical_groups = set()
+        basic_groups = {basic_features.DEFAULT_GROUP_ID}
         stock_groups = set()
         goods_groups = set()
         paid_groups = {self.plugin.paid_command_service.GLOBAL_GROUP}
@@ -212,7 +312,9 @@ class FinCenterWebApi:
         with self.plugin.db.session_scope() as session:
             for row in session.query(MarketGroupBinding).all():
                 physical_groups.add(row.physical_group_id)
-                if row.module == "stock":
+                if row.module == "basic":
+                    basic_groups.add(row.market_group_id)
+                elif row.module == "stock":
                     stock_groups.add(row.market_group_id)
                 elif row.module == "goods":
                     goods_groups.add(row.market_group_id)
@@ -251,12 +353,16 @@ class FinCenterWebApi:
             physical_groups.add(item.get("group_id", ""))
             paid_groups.add(item.get("paid_group_id", ""))
 
+        for group in basic_features.list_groups(self.plugin._raw_config, self.plugin.config):
+            basic_groups.add(group.get("group_id", ""))
+
         for comp in getattr(self.plugin.config.stock, "stock_companies", []) or []:
             if stock_group_id:
                 stock_codes.add(comp.get("code", ""))
 
         return self._ok({
             "physical_groups": self._sorted_values(v for v in physical_groups if v not in ("__global__", "__pending__")),
+            "basic_groups": self._sorted_values(basic_groups),
             "stock_groups": self._sorted_values(stock_groups),
             "goods_groups": self._sorted_values(goods_groups),
             "paid_groups": self._sorted_values(paid_groups),
@@ -265,6 +371,19 @@ class FinCenterWebApi:
             "paid_commands": self._sorted_values(paid_commands),
             "scanned_commands": list_other_plugin_commands(),
         })
+
+    async def discover_groups(self):
+        rows = {row["group_id"]: row for row in await self._discover_context_groups()}
+        with self.plugin.db.session_scope() as session:
+            for row in session.query(MarketGroupBinding.physical_group_id).distinct().all():
+                group_id = self._clean_id(row[0])
+                if self._is_real_option_value(group_id):
+                    rows.setdefault(group_id, {"group_id": group_id, "name": "", "source": "FinCenter绑定"})
+            for row in session.query(UserAccount.group_id).distinct().all():
+                group_id = self._clean_id(row[0])
+                if self._is_real_option_value(group_id):
+                    rows.setdefault(group_id, {"group_id": group_id, "name": "", "source": "账户数据"})
+        return self._ok(sorted(rows.values(), key=lambda x: x["group_id"]))
 
     async def get_settings(self):
         cfg = self.plugin.config
@@ -452,8 +571,8 @@ class FinCenterWebApi:
     async def set_binding(self):
         body = await self._body()
         module = self._clean_id(body.get("module"))
-        if module not in ("stock", "goods", "paid"):
-            return self._err("module 必须是 stock/goods/paid")
+        if module not in ("basic", "stock", "goods", "paid"):
+            return self._err("module 必须是 basic/stock/goods/paid")
         physical_group_id = self._clean_id(body.get("physical_group_id"))
         market_group_id = self._clean_id(body.get("market_group_id") or body.get("group_id") or physical_group_id)
         enabled = self._to_bool(body.get("enabled", True), True)
@@ -466,8 +585,8 @@ class FinCenterWebApi:
         body = await self._body()
         physical_group_id = self._clean_id(body.get("physical_group_id"))
         module = self._clean_id(body.get("module"))
-        if module not in ("stock", "goods", "paid", "all"):
-            return self._err("module 必须是 stock/goods/paid/all")
+        if module not in ("basic", "stock", "goods", "paid", "all"):
+            return self._err("module 必须是 basic/stock/goods/paid/all")
         if not physical_group_id:
             return self._err("physical_group_id 不能为空")
         with self.plugin.db.session_scope() as session:
@@ -498,20 +617,52 @@ class FinCenterWebApi:
         body = await self._body()
         module = self._clean_id(body.get("module"))
         group_id = self._clean_id(body.get("group_id"))
-        if module not in ("stock", "goods", "paid"):
-            return self._err("module 必须是 stock/goods/paid")
+        if module not in ("basic", "stock", "goods", "paid"):
+            return self._err("module 必须是 basic/stock/goods/paid")
         if not group_id:
             return self._err("group_id 不能为空")
         if group_id == self.plugin.paid_command_service.GLOBAL_GROUP:
             return self._err("全局付费组不能删除")
+        if module == "basic" and group_id == basic_features.DEFAULT_GROUP_ID:
+            return self._err("默认基础功能组不能删除")
 
-        if module == "goods":
+        if module == "basic":
+            count = self._remove_basic_group(group_id)
+        elif module == "goods":
             count = self._remove_goods_group(group_id)
         elif module == "stock":
             count = self._remove_stock_group(group_id)
         else:
             count = self._remove_paid_group(group_id)
         return self._ok({"count": count})
+
+    def _remove_basic_group(self, group_id: str) -> int:
+        removed = basic_features.remove_group(self.plugin._raw_config, group_id)
+        with self.plugin.db.session_scope() as session:
+            count = session.query(MarketGroupBinding).filter_by(module="basic", market_group_id=group_id).delete()
+        self._persist_raw_config()
+        return max(count, 1 if removed else 0)
+
+    # ---- 基础功能组 ----
+    async def get_basic_config(self):
+        group_id = self._clean_id(request.args.get("basic_group_id", "")) or basic_features.DEFAULT_GROUP_ID
+        group = basic_features.get_group(self.plugin._raw_config, self.plugin.config, group_id)
+        return self._ok({
+            "basic_group_id": group["group_id"],
+            "group": group,
+            "groups": basic_features.list_groups(self.plugin._raw_config, self.plugin.config),
+        })
+
+    async def save_basic_config(self):
+        body = await self._body()
+        group_id = self._clean_id(body.get("basic_group_id") or body.get("group_id"))
+        if not group_id:
+            return self._err("basic_group_id 不能为空")
+        payload = dict(body.get("group") or {})
+        payload["group_id"] = group_id
+        group = basic_features.upsert_group(self.plugin._raw_config, self.plugin.config, payload)
+        self._persist_raw_config()
+        return self._ok({"basic_group_id": group["group_id"], "group": group})
 
     def _remove_goods_group(self, group_id: str) -> int:
         with self.plugin.db.session_scope() as session:

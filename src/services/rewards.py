@@ -7,8 +7,8 @@ class ChatRewardService:
         self.db = db
         self.config = config
 
-    def process(self, group_id: str, user_id: str, user_name: str):
-        cfg = self.config.chat_reward
+    def process(self, group_id: str, user_id: str, user_name: str, feature_config=None):
+        cfg = (feature_config.chat_reward if feature_config else self.config.chat_reward)
         if not cfg.chat_reward_enabled:
             return
 

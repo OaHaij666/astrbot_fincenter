@@ -23,11 +23,12 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 from src.config import FinCenterConfig
-from src.core.database import DB
+from src.core.database import DB, MarketGroupBinding
 from src.services.market_manager import MarketManager
 from src.services.rewards import ChatRewardService
 from src.services.paid_command import PaidCommandService
 from src.services.web_api import FinCenterWebApi
+from src.services import basic_features
 from src.handlers import AccountHandler, StockHandler, GoodsHandler, AdminHandler
 from src.utils import plotter
 from src.utils.renderer import LocalHtmlRenderer
@@ -156,6 +157,27 @@ class FinCenterPlugin(Star):
                 return bool(enabled), str(item.get("paid_group_id") or physical_group_id)
         return True, physical_group_id
 
+    def get_basic_binding(self, physical_group_id: str) -> tuple[bool, str]:
+        physical_group_id = str(physical_group_id)
+        with self.db.session_scope() as session:
+            binding = session.query(MarketGroupBinding).filter_by(
+                physical_group_id=physical_group_id,
+                module="basic",
+            ).first()
+            if not binding:
+                return True, basic_features.DEFAULT_GROUP_ID
+            return bool(binding.enabled), binding.market_group_id or basic_features.DEFAULT_GROUP_ID
+
+    def get_basic_feature_config(self, physical_group_id: str):
+        enabled, group_id = self.get_basic_binding(physical_group_id)
+        group = basic_features.get_group(self._raw_config, self.config, group_id)
+        runtime = basic_features.to_runtime(group)
+        runtime.enabled = enabled
+        if not enabled:
+            runtime.signin.signin_enabled = False
+            runtime.chat_reward.chat_reward_enabled = False
+        return runtime
+
     def set_market_binding(self, physical_group_id: str, module: str, market_group_id: str = None, enabled: bool = True):
         if hasattr(self.db, "set_market_binding"):
             return self.db.set_market_binding(physical_group_id, module, market_group_id, enabled)
@@ -229,6 +251,7 @@ class FinCenterPlugin(Star):
         group_id = self._resolve_group_id(raw_group_id)
         stock_enabled, stock_group_id = self.get_stock_binding(raw_group_id)
         goods_enabled, goods_group_id = self.get_goods_binding(raw_group_id)
+        feature_config = self.get_basic_feature_config(raw_group_id)
         user_id = str(event.get_sender_id())
         user_name = self._get_user_name(event)
         args = self._parse_args(event)
@@ -254,34 +277,34 @@ class FinCenterPlugin(Star):
 
         # ── 账户指令 ──
         if module == "open":
-            async for result in self.account_handler.handle_open(event, args, group_id, user_id, user_name):
+            async for result in self.account_handler.handle_open(event, args, group_id, user_id, user_name, feature_config):
                 yield result
         elif module == "me":
-            async for result in self.account_handler.handle_me(event, group_id, user_id, user_name, stock_group_id, goods_group_id, stock_enabled, goods_enabled):
+            async for result in self.account_handler.handle_me(event, group_id, user_id, user_name, stock_group_id, goods_group_id, stock_enabled, goods_enabled, feature_config):
                 yield result
         elif module == "sign":
-            async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name):
+            async for result in self.account_handler.handle_sign(event, group_id, user_id, user_name, feature_config):
                 yield result
         elif module == "transfer":
-            async for result in self.account_handler.handle_transfer(event, args, group_id, user_id, user_name):
+            async for result in self.account_handler.handle_transfer(event, args, group_id, user_id, user_name, feature_config):
                 yield result
         elif module == "rank":
-            async for result in self.admin_handler.handle_rank(event, args, raw_group_id, group_id, user_id, user_name):
+            async for result in self.admin_handler.handle_rank(event, args, raw_group_id, group_id, user_id, user_name, feature_config):
                 yield result
 
         # ── 股市指令 ──
         elif module == "stock":
-            async for result in self.stock_handler.handle(event, args, stock_group_id, group_id, user_id, user_name, stock_enabled):
+            async for result in self.stock_handler.handle(event, args, stock_group_id, group_id, user_id, user_name, stock_enabled, feature_config):
                 yield result
 
         # ── 物资指令 ──
         elif module == "goods":
-            async for result in self.goods_handler.handle(event, args, goods_group_id, group_id, user_id, user_name, goods_enabled):
+            async for result in self.goods_handler.handle(event, args, goods_group_id, group_id, user_id, user_name, goods_enabled, feature_config):
                 yield result
 
         # ── 管理员指令 ──
         elif module == "admin":
-            async for result in self.admin_handler.handle(event, args, raw_group_id, group_id, user_id, user_name):
+            async for result in self.admin_handler.handle(event, args, raw_group_id, group_id, user_id, user_name, feature_config):
                 yield result
 
         else:
@@ -299,6 +322,7 @@ class FinCenterPlugin(Star):
         """
         raw_group_id = self._extract_raw_group_id(event)
         group_id = self._resolve_group_id(raw_group_id)
+        feature_config = self.get_basic_feature_config(raw_group_id)
         paid_enabled, paid_group_id = self.get_paid_binding(raw_group_id)
         user_id = str(event.get_sender_id())
         user_name = self._get_user_name(event)
@@ -307,7 +331,8 @@ class FinCenterPlugin(Star):
             return
 
         # 聊天奖励
-        self.reward_service.process(group_id, user_id, user_name)
+        if getattr(feature_config, "enabled", True):
+            self.reward_service.process(group_id, user_id, user_name, feature_config)
 
         # 付费指令检查
         message = event.message_str.strip()
@@ -326,7 +351,7 @@ class FinCenterPlugin(Star):
             return
 
         status, reply, record = try_deduct(
-            message, paid_group_id, group_id, user_id
+            message, paid_group_id, group_id, user_id, feature_config
         )
         if status == "charged" and record is not None:
             event.set_extra("fc_paid_record", record)

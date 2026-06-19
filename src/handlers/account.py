@@ -17,7 +17,8 @@ class AccountHandler:
     def __init__(self, plugin, html_render):
         self.plugin = plugin
 
-    async def handle_open(self, event, args, group_id, user_id, user_name):
+    async def handle_open(self, event, args, group_id, user_id, user_name, feature_config=None):
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
         target_id = None
         if len(args) >= 3:
             raw_id = args[2]
@@ -42,10 +43,10 @@ class AccountHandler:
                     yield event.plain_result("你还没有账户，请先 /fc open 开户")
                     return
 
-                if payer.balance < self.plugin.config.currency.open_account_cost:
+                if payer.balance < currency_cfg.open_account_cost:
                     yield event.plain_result(
-                        f"余额不足。代开户费用为 {self.plugin.config.currency.open_account_cost:.2f} "
-                        f"{self.plugin.config.currency.currency_icon}{self.plugin.config.currency.currency_name}，"
+                        f"余额不足。代开户费用为 {currency_cfg.open_account_cost:.2f} "
+                        f"{currency_cfg.currency_icon}{currency_cfg.currency_name}，"
                         f"当前余额 {payer.balance:.2f}"
                     )
                     return
@@ -57,19 +58,19 @@ class AccountHandler:
                     yield event.plain_result(f"目标用户 {target_id} 已经有账户了！")
                     return
 
-                payer.balance -= self.plugin.config.currency.open_account_cost
+                payer.balance -= currency_cfg.open_account_cost
 
                 self.plugin.db.get_or_create_user(
                     session, group_id, str(target_id), str(target_id),
-                    self.plugin.config.currency.initial_balance
+                    currency_cfg.initial_balance
                 )
 
             yield event.plain_result(
                 f"✅ 代开户成功！\n"
-                f"为 {target_id} 创建了账户，获得 {self.plugin.config.currency.initial_balance:.2f} "
-                f"{self.plugin.config.currency.currency_icon}{self.plugin.config.currency.currency_name}\n"
-                f"你支付了 {self.plugin.config.currency.open_account_cost:.2f} "
-                f"{self.plugin.config.currency.currency_icon}{self.plugin.config.currency.currency_name} 的手续费"
+                f"为 {target_id} 创建了账户，获得 {currency_cfg.initial_balance:.2f} "
+                f"{currency_cfg.currency_icon}{currency_cfg.currency_name}\n"
+                f"你支付了 {currency_cfg.open_account_cost:.2f} "
+                f"{currency_cfg.currency_icon}{currency_cfg.currency_name} 的手续费"
             )
             return
 
@@ -83,15 +84,15 @@ class AccountHandler:
 
             self.plugin.db.get_or_create_user(
                 session, group_id, user_id, user_name,
-                self.plugin.config.currency.initial_balance
+                currency_cfg.initial_balance
             )
 
         yield event.plain_result(
-            f"✅ 开户成功！获得 {self.plugin.config.currency.initial_balance:.2f} "
-            f"{self.plugin.config.currency.currency_icon}{self.plugin.config.currency.currency_name}"
+            f"✅ 开户成功！获得 {currency_cfg.initial_balance:.2f} "
+            f"{currency_cfg.currency_icon}{currency_cfg.currency_name}"
         )
 
-    async def handle_me(self, event, group_id, user_id, user_name, stock_group_id=None, goods_group_id=None, stock_enabled=True, goods_enabled=True):
+    async def handle_me(self, event, group_id, user_id, user_name, stock_group_id=None, goods_group_id=None, stock_enabled=True, goods_enabled=True, feature_config=None):
         with self.plugin.db.session_scope() as session:
             user = session.query(UserAccount).filter_by(
                 group_id=group_id, user_id=user_id
@@ -106,8 +107,9 @@ class AccountHandler:
             total_spent = float(user.total_spent or 0)
             created_at = user.created_at.strftime('%Y-%m-%d') if user.created_at else '未知'
 
-        currency_name = self.plugin.config.currency.currency_name
-        currency_icon = self.plugin.config.currency.currency_icon
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
+        currency_name = currency_cfg.currency_name
+        currency_icon = currency_cfg.currency_icon
 
         holdings = []
         if stock_enabled and stock_group_id and self.plugin.stock_market:
@@ -156,8 +158,9 @@ class AccountHandler:
         msg = "\n".join(lines)
         yield event.plain_result(msg)
 
-    async def handle_sign(self, event, group_id, user_id, user_name):
-        signin_cfg = self.plugin.config.signin
+    async def handle_sign(self, event, group_id, user_id, user_name, feature_config=None):
+        signin_cfg = feature_config.signin if feature_config else self.plugin.config.signin
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
         if not signin_cfg.signin_enabled:
             yield event.plain_result("签到功能未启用")
             return
@@ -207,8 +210,8 @@ class AccountHandler:
             user.add_balance(total_reward)
             user.add_earned(total_reward)
 
-        currency_name = self.plugin.config.currency.currency_name
-        currency_icon = self.plugin.config.currency.currency_icon
+        currency_name = currency_cfg.currency_name
+        currency_icon = currency_cfg.currency_icon
 
         # 图片优先
         result = plotter.render_signin_html(
@@ -234,7 +237,7 @@ class AccountHandler:
 
         yield event.plain_result(msg)
 
-    async def handle_transfer(self, event, args, group_id, user_id, user_name):
+    async def handle_transfer(self, event, args, group_id, user_id, user_name, feature_config=None):
         if len(args) < 4:
             yield event.plain_result("格式: /fc transfer <@用户> <金额>")
             return
@@ -265,7 +268,8 @@ class AccountHandler:
             yield event.plain_result("不能给自己转账")
             return
 
-        currency_name = self.plugin.config.currency.currency_name
+        currency_cfg = feature_config.currency if feature_config else self.plugin.config.currency
+        currency_name = currency_cfg.currency_name
 
         with self.plugin.db.session_scope() as session:
             from_user = session.query(UserAccount).filter_by(
