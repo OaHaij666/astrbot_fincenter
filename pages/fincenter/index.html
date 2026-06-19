@@ -282,7 +282,6 @@
               <select id="basicGroupId"></select>
             </div>
             <button id="addBasicGroup" class="ghost">新增基础功能组</button>
-            <button id="loadBasic">读取</button>
             <button id="saveBasic" class="ok">保存基础组</button>
             <button id="removeBasicGroup" class="danger">删除基础组</button>
           </div>
@@ -320,7 +319,6 @@
               <select id="goodsGroupId"></select>
             </div>
             <button id="addGoodsGroup" class="ghost">新增物资组</button>
-            <button id="loadGoods">读取</button>
             <button id="openGoodsCreate" class="ok">新增商品</button>
             <button id="resetGoods" class="secondary">重置价格</button>
             <button id="removeGoodsGroup" class="danger">删除物资组</button>
@@ -348,7 +346,6 @@
               <select id="stockGroupId"></select>
             </div>
             <button id="addStockGroup" class="ghost">新增股市组</button>
-            <button id="loadStock">读取</button>
             <button id="openStockCreate" class="ok">新增股票</button>
             <button id="stockOpen" class="ok">开市</button>
             <button id="stockClose" class="secondary">休市</button>
@@ -378,7 +375,6 @@
               <select id="paidGroupId"></select>
             </div>
             <button id="addPaidGroup" class="ghost">新增付费组</button>
-            <button id="loadPaid">读取</button>
             <button id="openCommandCreate" class="ok">新增规则</button>
             <button id="scanCommands" class="secondary">扫描命令</button>
             <button id="removePaidGroup" class="danger">删除付费组</button>
@@ -617,7 +613,7 @@ function openCreatePopover(anchor, title, placeholder, onConfirm) {
 }
 document.addEventListener("click", (e) => {
   if (!activePopover) return;
-  if (activePopover.contains(e.target) || e.target.closest("[data-create-select], #addPhysicalGroup, #addGoodsGroup, #addStockGroup, #addPaidGroup")) return;
+  if (activePopover.contains(e.target) || e.target.closest("[data-create-select], #addPhysicalGroup, #addBasicGroup, #addGoodsGroup, #addStockGroup, #addPaidGroup")) return;
   closePopover();
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePopover(); closeDrawer(); } });
@@ -628,6 +624,18 @@ function switchTab(name) {
   document.querySelectorAll("section").forEach((s) => s.classList.toggle("active", s.id === name));
   const titles = { groups: "群配置", basic: "基础功能组", goods: "物资组", stock: "股市组", paid: "付费组", settings: "基础设置" };
   $("pageHeading").textContent = titles[name] || "FinCenter";
+  loadTabSelection(name);
+}
+function loadTabSelection(name) {
+  const loaders = {
+    basic: ["basicGroupId", loadBasic],
+    goods: ["goodsGroupId", loadGoods],
+    stock: ["stockGroupId", loadStock],
+    paid: ["paidGroupId", loadPaid],
+  };
+  const item = loaders[name];
+  if (!item || !cleanValue($(item[0]).value)) return;
+  Promise.resolve(item[1]()).catch((e) => setStatus(e.message || String(e)));
 }
 function applyOptions(options = {}) {
   if ("physical_groups" in options) setSelectOptions("physicalGroupId", options.physical_groups);
@@ -724,6 +732,7 @@ function createForSelect(button, selectId) {
     if (kind === "stockGroup") $("stockGroupId").value = value;
     if (kind === "paidGroup") $("paidGroupId").value = value;
     setStatus(`${label}已添加到当前页面，保存或新增内容后生效`);
+    loadTabSelection({ basicGroup: "basic", goodsGroup: "goods", stockGroup: "stock", paidGroup: "paid" }[kind]);
   });
 }
 async function removeCurrentGroup(module, selectId, kind) {
@@ -1134,20 +1143,17 @@ window.AstrBotPluginPage.ready().then(() => {
   $("physicalGroupId").onchange = () => loadOverview().catch((e) => setStatus(e.message || String(e)));
 
   bind("addBasicGroup", (button) => createForSelect(button, "basicGroupId"));
-  bind("loadBasic", loadBasic);
   bind("saveBasic", saveBasic);
   bind("removeBasicGroup", () => removeCurrentGroup("basic", "basicGroupId", "basicGroup"));
   $("basicGroupId").onchange = () => loadBasic().catch((e) => setStatus(e.message || String(e)));
 
   bind("addGoodsGroup", (button) => createForSelect(button, "goodsGroupId"));
-  bind("loadGoods", loadGoods);
   bind("openGoodsCreate", () => openGoodsEditor());
   bind("resetGoods", resetGoods);
   bind("removeGoodsGroup", () => removeCurrentGroup("goods", "goodsGroupId", "goodsGroup"));
   $("goodsGroupId").onchange = () => loadGoods().catch((e) => setStatus(e.message || String(e)));
 
   bind("addStockGroup", (button) => createForSelect(button, "stockGroupId"));
-  bind("loadStock", loadStock);
   bind("openStockCreate", () => openStockEditor());
   bind("stockOpen", () => setStockMode("open"));
   bind("stockClose", () => setStockMode("close"));
@@ -1156,7 +1162,6 @@ window.AstrBotPluginPage.ready().then(() => {
   $("stockGroupId").onchange = () => loadStock().catch((e) => setStatus(e.message || String(e)));
 
   bind("addPaidGroup", (button) => createForSelect(button, "paidGroupId"));
-  bind("loadPaid", loadPaid);
   bind("openCommandCreate", () => openCommandEditor());
   bind("scanCommands", scanCommands);
   bind("removePaidGroup", () => removeCurrentGroup("paid", "paidGroupId", "paidGroup"));
